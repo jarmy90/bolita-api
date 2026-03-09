@@ -13,31 +13,39 @@ app.use((req, res, next) => {
 });
 
 // ─── Helper: Fetch JSON from SofaScore (works fine server-side) ─────────────
+let lastSofaStatus = 200;
+let lastSofaError = null;
+
 function fetchSofa(path) {
     return new Promise((resolve, reject) => {
+        lastSofaError = null;
         const options = {
             hostname: 'api.sofascore.com',
             path: '/api/v1' + path,
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.sofascore.com/',
-                'Origin': 'https://www.sofascore.com'
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+                'Cache-Control': 'no-cache'
             }
         };
         const req = https.request(options, (res) => {
+            lastSofaStatus = res.statusCode;
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
                 try {
                     if (res.statusCode !== 200) {
+                        lastSofaError = `Sofa Error ${res.statusCode}`;
                         console.error(`[-] Sofa Error ${res.statusCode}: ${data.slice(0, 100)}`);
                         return resolve({ events: [] });
                     }
                     resolve(JSON.parse(data));
                 }
-                catch (e) { reject(new Error('JSON parse error: ' + data.slice(0, 200))); }
+                catch (e) {
+                    lastSofaError = e.message;
+                    reject(new Error('JSON parse error: ' + data.slice(0, 200)));
+                }
             });
         });
 
@@ -152,10 +160,15 @@ app.get('/api/tennis/live', async (req, res) => {
         ].slice(0, 15);
 
         console.log(`[+] Tennis events sent: ${events.length}`);
-        res.json({ success: true, count: events.length, events });
+        res.json({
+            success: true,
+            count: events.length,
+            events,
+            debug: { status: lastSofaStatus, error: lastSofaError }
+        });
     } catch (error) {
         console.error('[-] /api/tennis/live error:', error.message);
-        res.status(500).json({ success: false, error: error.message, events: [] });
+        res.status(500).json({ success: false, error: error.message, events: [], debug: { error: error.message } });
     }
 });
 
@@ -263,10 +276,30 @@ app.get('/api/football/live', async (req, res) => {
         ].slice(0, 15);
 
         console.log(`[+] Football events sent: ${events.length}`);
-        res.json({ success: true, count: events.length, events });
+        res.json({
+            success: true,
+            count: events.length,
+            events,
+            debug: { status: lastSofaStatus, error: lastSofaError }
+        });
     } catch (error) {
         console.error('[-] /api/football/live error:', error.message);
-        res.status(500).json({ success: false, error: error.message, events: [] });
+        res.status(500).json({ success: false, error: error.message, events: [], debug: { error: error.message } });
+    }
+});
+
+app.get('/api/debug', async (req, res) => {
+    try {
+        console.log('[GET] /api/debug');
+        const data = await fetchSofa('/sport/football/events/live');
+        res.json({
+            success: true,
+            lastSofaStatus,
+            lastSofaError,
+            sampleData: data?.events ? data.events.slice(0, 1) : null
+        });
+    } catch (e) {
+        res.json({ success: false, error: e.message, lastSofaStatus, lastSofaError });
     }
 });
 
