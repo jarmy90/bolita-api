@@ -1,479 +1,157 @@
 const express = require('express');
-const { chromium } = require('playwright');
 const https = require('https');
-const Tesseract = require('tesseract.js');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ─── CORS ──────────────────────────────────────────────────────────────────
+// Configuración de Proxy (para saltar el 403 de SofaScore en Render)
+const CLOUDFLARE_PROXY_URL = 'https://bolita1.pages.dev/sofa-proxy';
+
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
 
-// ─── TennisLive Helper (Stealth Scrape) ─────────────────────────────────────
-async function scrapeTennisLive() {
-    if (!_browser) {
-        _browser = await chromium.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        });
-    }
-    const context = await _browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+// ─── HELPER: FETCH GENERICO ────────────────────────────────────────────────
+function fetchURL(url, headers = {}) {
+    return new Promise((resolve, reject) => {
+        const options = {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                ...headers
+            }
+        };
+        https.get(url, options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => resolve({ status: res.statusCode, body: data }));
+        }).on('error', reject);
     });
-    const page = await context.newPage();
+}
+
+// ─── TENNIS: SCRAPER LIGERO (TENNISLIVE.NET) ───────────────────────────────
+async function scrapeTennisLiveLight() {
     try {
-        console.log('[TennisLive] Navigating to tennislive.net...');
-        await page.goto('https://www.tennislive.net/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        console.log('[Tennis] Scrapeando TennisLive.net...');
+        const { body } = await fetchURL('https://www.tennislive.net/');
 
-        const matches = await page.evaluate(() => {
-            const results = [];
-            // Buscamos los contenedores de partidos en vivo o del día
-            const rows = document.querySelectorAll('table.table_stats_match tr');
+        const events = [];
+        // Regex para encontrar tablas de partidos
+        const tableRegex = /<table class="table_stats_match">([\s\S]*?)<\/table>/g;
+        let matchTable;
 
-            rows.forEach(row => {
-                const homeLink = row.querySelector('td.player1 a');
-                const awayLink = row.querySelector('td.player2 a');
-                if (!homeLink || !awayLink) return;
+        while ((matchTable = tableRegex.exec(body)) !== null) {
+            const content = matchTable[1];
 
-                const home = homeLink.getAttribute('title') || homeLink.textContent.trim();
-                const away = awayLink.getAttribute('title') || awayLink.textContent.trim();
+            // Extraer jugadores
+            const playerRegex = /<td class="player[12]">.*?title="([^"]+)"/g;
+            const players = [];
+            let p;
+            while ((p = playerRegex.exec(content)) !== null) players.push(p[1]);
 
-                // Marcador de sets (ej: 6-4, 3-2)
-                const scores = Array.from(row.querySelectorAll('td.score')).map(td => td.textContent.trim()).filter(s => s !== '');
-                const currentPoints = row.querySelector('td.points')?.textContent.trim() || '';
+            if (players.length >= 2) {
+                // Extraer marcador de sets
+                const scoreRegex = /<td class="score">([^<]*)<\/td>/g;
+                const scores = [];
+                let s;
+                while ((s = scoreRegex.exec(content)) !== null) scores.push(s[1].trim());
 
-                // Indicador "En Vivo" (punto amarillo/clase activa)
-                const isLive = !!row.querySelector('td.live_score_ongoing') || currentPoints !== '';
+                // Puntos actuales (si está en vivo)
+                const pointMatch = content.match(/<td class="points">([^<]*)<\/td>/);
+                const points = pointMatch ? pointMatch[1].trim() : '';
+                const isLive = content.includes('live_score_ongoing') || points !== '';
 
-                results.push({
-                    home,
-                    away,
+                events.push({
+                    home: players[0],
+                    away: players[1],
                     tournament: 'Tennis Live',
-                    status: isLive ? (currentPoints ? `Points: ${currentPoints}` : 'En juego') : 'Upcoming',
+                    status: isLive ? (points ? `Puntos: ${points}` : 'En juego') : 'Próximamente',
                     isLive,
                     score: scores.length >= 2 ? { home: scores[0], away: scores[1] } : null,
                     sport: 'tennis',
-                    sofaEventId: 'tl_' + Math.random().toString(36).substr(2, 9) // ID temporal para polling
+                    sofaEventId: 'tl_' + Math.random().toString(36).substr(2, 5)
                 });
-            });
-            return results;
-        });
-
-        console.log(`[TennisLive] Extracted ${matches.length} matches.`);
-        return matches;
-    } catch (e) {
-        console.error('[TennisLive] Error:', e.message);
-        return [];
-    } finally {
-        await page.close();
-        await context.close();
-    }
-}
-let _browser = null;
-async function fetchSofaPlaywright(path) {
-    if (!_browser) {
-        _browser = await chromium.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        });
-    }
-    const context = await _browser.newContext({
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
-    });
-    const page = await context.newPage();
-    try {
-        const url = 'https://api.sofascore.com/api/v1' + path;
-        console.log(`[PW] Fetching ${url}...`);
-        const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-        if (response.status() === 200) {
-            return await response.json();
-        } else {
-            console.error(`[PW] Error ${response.status()}: ${path}`);
-            return { events: [] };
-        }
-    } catch (e) {
-        console.error(`[PW] Exception: ${e.message}`);
-        return { events: [] };
-    } finally {
-        await page.close();
-        await context.close();
-    }
-}
-let lastSofaStatus = 200;
-let lastSofaError = null;
-
-function fetchSofa(path) {
-    return new Promise(async (resolve, reject) => {
-        lastSofaError = null;
-        const options = {
-            hostname: 'api.sofascore.com',
-            path: '/api/v1' + path,
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Host': 'api.sofascore.com'
             }
-        };
-        const req = https.request(options, (res) => {
-            lastSofaStatus = res.statusCode;
-            let data = '';
-            res.on('data', chunk => data += chunk);
-            res.on('end', async () => {
-                try {
-                    if (res.statusCode === 403 || res.statusCode === 429) {
-                        console.warn(`[!] Sofa ${res.statusCode} detectado. Usando Playwright Fallback...`);
-                        const pwData = await fetchSofaPlaywright(path);
-                        return resolve(pwData);
-                    }
-                    if (res.statusCode !== 200) {
-                        lastSofaError = `Sofa Error ${res.statusCode}`;
-                        console.error(`[-] Sofa Error ${res.statusCode}: ${data.slice(0, 100)}`);
-                        return resolve({ events: [] });
-                    }
-                    resolve(JSON.parse(data));
-                }
-                catch (e) {
-                    lastSofaError = e.message;
-                    reject(new Error('JSON parse error: ' + data.slice(0, 200)));
-                }
-            });
+        }
+        return events;
+    } catch (e) {
+        console.error('[Tennis] Error:', e.message);
+        return [];
+    }
+}
+
+// ─── FOOTBALL: FETCH VIA CLOUDFLARE PROXY (PARA EVITAR 403) ────────────────
+async function fetchFootballLiveSofa() {
+    try {
+        console.log('[Football] Buscando en SofaScore (vía Proxy Cloudflare)...');
+        const url = `${CLOUDFLARE_PROXY_URL}/sport/football/events/live`;
+        const { status, body } = await fetchURL(url);
+
+        if (status !== 200) {
+            console.log(`[!] Proxy devolvió ${status}. Intentando fallback a TheSportsDB...`);
+            return null;
+        }
+
+        const data = JSON.parse(body);
+        return (data.events || []).map(ev => {
+            const hs = ev.homeScore || {};
+            const as = ev.awayScore || {};
+            return {
+                home: ev.homeTeam?.name || 'Local',
+                away: ev.awayTeam?.name || 'Visita',
+                tournament: ev.tournament?.name || '',
+                status: ev.status?.description || 'En juego',
+                isLive: true,
+                score: { home: String(hs.current ?? 0), away: String(as.current ?? 0) },
+                sport: 'football',
+                sofaEventId: ev.id
+            };
         });
-
-        req.on('error', reject);
-        req.setTimeout(15000, () => { req.destroy(new Error('timeout')); });
-        req.end();
-    });
+    } catch (e) {
+        console.error('[Football] Error Proxy:', e.message);
+        return null;
+    }
 }
 
-// ─── Helper: Is ATP/WTA single ───────────────────────────────────────────────
-function isAtpWtaSingles(event) {
-    const catSlug = (event?.tournament?.category?.slug || '').toLowerCase();
-    const catName = (event?.tournament?.category?.name || '').toLowerCase();
-    const isAtpWta = catSlug === 'atp' || catSlug.startsWith('wta') || catName.includes('atp') || catName.includes('wta');
-    if (!isAtpWta) return false;
-    // Exclude doubles
-    const home = event?.homeTeam?.name || event?.homeTeam?.shortName || '';
-    const away = event?.awayTeam?.name || event?.awayTeam?.shortName || '';
-    if (home.includes(' / ') || away.includes(' / ')) return false;
-    return true;
+async function fetchFootballTSDB() {
+    try {
+        console.log('[Football] Fallback a TheSportsDB...');
+        const { body } = await fetchURL('https://www.thesportsdb.com/api/v1/json/3/livescore.php?s=Soccer');
+        const data = JSON.parse(body);
+        return (data.events || []).map(ev => ({
+            home: ev.strHomeTeam,
+            away: ev.strAwayTeam,
+            tournament: ev.strLeague,
+            status: ev.strStatus + (ev.intElapsed ? ` ${ev.intElapsed}'` : ''),
+            isLive: true,
+            score: { home: ev.intHomeScore, away: ev.intAwayScore },
+            sport: 'football'
+        }));
+    } catch (e) {
+        return [];
+    }
 }
 
-// ─── Helper: Pack a SofaScore event into our standard format ────────────────
-function packTennisEvent(ev, isLive) {
-    const hs = ev?.homeScore || {};
-    const as = ev?.awayScore || {};
-    const sets = (Number.isFinite(hs.current) && Number.isFinite(as.current))
-        ? `${hs.current}-${as.current}` : null;
-    const ph = [hs.period1, hs.period2, hs.period3, hs.period4, hs.period5].filter(Number.isFinite);
-    const pa = [as.period1, as.period2, as.period3, as.period4, as.period5].filter(Number.isFinite);
-    let games = null;
-    if (ph.length && pa.length) games = `${ph[ph.length - 1]}-${pa[pa.length - 1]}`;
-    const scoreLabel = sets ? (games ? `Sets ${sets} · Games ${games}` : `Sets ${sets}`) : (games || '');
+// ─── ENDPOINTS ─────────────────────────────────────────────────────────────
 
-    return {
-        home: ev?.homeTeam?.shortName || ev?.homeTeam?.name || 'Jugador 1',
-        away: ev?.awayTeam?.shortName || ev?.awayTeam?.name || 'Jugador 2',
-        tournament: ev?.tournament?.uniqueTournament?.name || ev?.tournament?.name || '',
-        status: isLive ? (scoreLabel || 'En juego') : new Date((ev?.startTimestamp || 0) * 1000).toISOString(),
-        isLive,
-        score: sets ? { home: String(hs.current ?? ''), away: String(as.current ?? '') } : null,
-        sofaEventId: ev.id,
-        sport: 'tennis'
-    };
-}
-
-// ─── Helper: Pack a SofaScore Football event ──────────────────────────────
-function packFootballEvent(ev, isLive) {
-    const hs = ev?.homeScore || {};
-    const as = ev?.awayScore || {};
-    const scoreText = `${hs.current ?? 0}-${as.current ?? 0}`;
-    const time = ev?.status?.description || ''; // e.g. "90'", "HT", "FT"
-    const elapsed = ev?.status?.type === 'inprogress' ? (parseInt(time) || 0) : 0;
-
-    return {
-        home: ev?.homeTeam?.shortName || ev?.homeTeam?.name || 'Local',
-        away: ev?.awayTeam?.shortName || ev?.awayTeam?.name || 'Visitante',
-        tournament: ev?.tournament?.uniqueTournament?.name || ev?.tournament?.name || '',
-        status: isLive ? (time || 'En juego') : new Date((ev?.startTimestamp || 0) * 1000).toISOString(),
-        isLive,
-        score: { home: String(hs.current ?? 0), away: String(as.current ?? 0) },
-        elapsed: elapsed,
-        sofaEventId: ev.id,
-        sport: 'football'
-    };
-}
-
-
-// ─── Helper: Today + Tomorrow in YYYY-MM-DD UTC ─────────────────────────────
-function utcDates(offsetDays = 0) {
-    const d = new Date(Date.now() + offsetDays * 86400000);
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-}
-
-// ─── ENDPOINT: TENIS LIVE (TennisLive.net Scraper) ──────────────────────────
 app.get('/api/tennis/live', async (req, res) => {
-    try {
-        console.log('[GET] /api/tennis/live (TennisLive.net)');
-
-        let events = await scrapeTennisLive();
-
-        // Fallback: Si TennisLive falla o está vacío, intentamos SofaScore como último recurso
-        if (!events.length) {
-            console.log('[!] TennisLive empty, falling back to SofaScore...');
-            const liveData = await fetchSofa('/sport/tennis/events/live').catch(() => ({ events: [] }));
-            events = (liveData?.events || []).map(e => packTennisEvent(e, true));
-        }
-
-        console.log(`[+] Tennis events sent: ${events.length}`);
-        res.json({
-            success: true,
-            count: events.length,
-            events,
-            debug: { source: events.length > 0 ? 'tennislive' : 'fallback' }
-        });
-    } catch (error) {
-        console.error('[-] /api/tennis/live error:', error.message);
-        res.status(500).json({ success: false, error: error.message, events: [] });
-    }
+    const events = await scrapeTennisLiveLight();
+    res.json({ success: true, count: events.length, events });
 });
 
-
-// ─── Flashscore Football Scraper (Playwright) ───────────────────────────────
-async function scrapeFlashscoreFootball() {
-    console.log('[+] Scraping Flashscore for Football...');
-    const browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
-    const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        viewport: { width: 1280, height: 720 }
-    });
-    const page = await context.newPage();
-    let matches = [];
-
-    try {
-        await page.goto('https://www.flashscore.es/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForSelector('.event__match', { timeout: 15000 }).catch(() => { });
-
-        matches = await page.evaluate(() => {
-            const results = [];
-            const nodes = document.querySelectorAll('.event__match');
-            nodes.forEach(node => {
-                let tournament = 'Desconocido';
-                let prev = node.previousElementSibling;
-                while (prev) {
-                    if (prev.classList.contains('event__header')) {
-                        const t = prev.querySelector('.event__title--name');
-                        tournament = t ? t.textContent.trim() : '';
-                        break;
-                    }
-                    prev = prev.previousElementSibling;
-                }
-                const txtT = tournament.toLowerCase();
-                const isWanted = txtT.includes('laliga') || txtT.includes('primera') || txtT.includes('premier league') || txtT.includes('champions') || txtT.includes('liga española');
-                if (!isWanted) return;
-
-                const home = node.querySelector('.event__participant--home')?.textContent.trim() || 'Local';
-                const away = node.querySelector('.event__participant--away')?.textContent.trim() || 'Visitante';
-                const stageNode = node.querySelector('.event__stage');
-                const timeNode = node.querySelector('.event__time');
-                const isLive = node.classList.contains('event__match--live') || !!stageNode;
-                const status = isLive ? (stageNode?.textContent.trim() || 'En juego') : (timeNode?.textContent.trim() || '');
-                const homeScore = node.querySelector('.event__score--home')?.textContent.trim() || '0';
-                const awayScore = node.querySelector('.event__score--away')?.textContent.trim() || '0';
-                results.push({ tournament, home, away, status, isLive, score: { home: homeScore, away: awayScore } });
-            });
-            return results;
-        });
-        console.log(`[+] Football matches: ${matches.length}`);
-    } catch (e) {
-        console.error('[-] Football scraping error:', e.message);
-    } finally {
-        await browser.close();
-    }
-    return matches;
-}
-
-// ─── ENDPOINT: FUTBOL LIVE (SofaScore API) ──────────────────────────────────
 app.get('/api/football/live', async (req, res) => {
-    try {
-        console.log('[GET] /api/football/live');
-
-        // 1. Live matches
-        const liveData = await fetchSofa('/sport/football/events/live').catch(e => {
-            console.error('[-] Football Live Fetch Error:', e.message);
-            return { events: [] };
-        });
-
-        // Filtrar por ligas importantes para evitar ruido
-        const importantLeagues = ['laliga', 'premier league', 'serie a', 'bundesliga', 'ligue 1', 'champions league', 'europa league', 'eredivisie', 'liga portugal', 'brazil', 'argentina', 'colombia', 'mexico', 'fa cup', 'copa del rey'];
-        let liveEvents = (liveData?.events || []).filter(e => {
-            const t = (e?.tournament?.uniqueTournament?.name || e?.tournament?.name || '').toLowerCase();
-            return importantLeagues.some(L => t.includes(L));
-        });
-
-        // Fallback: si no hay "importantes", permitimos cualquier partido de ligas de primer nivel (Categoría "Soccer")
-        if (!liveEvents.length && liveData?.events?.length) {
-            console.log('[!] No "important" live matches, returning top 10 general live');
-            liveEvents = liveData.events.slice(0, 10);
-        }
-
-        // 2. Scheduled today
-        const today = utcDates(0);
-        const scheduledData = await fetchSofa(`/sport/football/scheduled-events/${today}`).catch(e => {
-            console.error('[-] Football Scheduled Fetch Error:', e.message);
-            return { events: [] };
-        });
-        const nowSec = Math.floor(Date.now() / 1000);
-        const upcomingEvents = (scheduledData?.events || []).filter(e => {
-            if (!e || (e.startTimestamp || 0) < nowSec - 600) return false;
-            const t = (e?.tournament?.uniqueTournament?.name || e?.tournament?.name || '').toLowerCase();
-            return importantLeagues.some(L => t.includes(L));
-        });
-
-        const seen = new Set(liveEvents.map(e => e.id));
-        const finalUpcoming = upcomingEvents.filter(e => !seen.has(e.id)).slice(0, 8);
-
-        let events = [
-            ...liveEvents.map(e => packFootballEvent(e, true)),
-            ...finalUpcoming.map(e => packFootballEvent(e, false))
-        ].slice(0, 15);
-
-        // Fallback: TheSportsDB si SofaScore falla (403 detectado)
-        if (!events.length || lastSofaStatus !== 200) {
-            console.log('[!] Football: SofaScore 403/Empty, attempting TheSportsDB fallback...');
-            try {
-                const resTS = await new Promise(r => {
-                    https.get('https://www.thesportsdb.com/api/v1/json/3/livescore.php?s=Soccer', (res) => {
-                        let d = ''; res.on('data', c => d += c); res.on('end', () => r(JSON.parse(d)));
-                    }).on('error', () => r(null));
-                });
-                if (resTS?.events) {
-                    const tsEvents = resTS.events.map(ev => ({
-                        home: ev.strHomeTeam,
-                        away: ev.strAwayTeam,
-                        tournament: ev.strLeague,
-                        status: ev.strStatus + (ev.intElapsed ? ` ${ev.intElapsed}'` : ''),
-                        isLive: true,
-                        score: { home: ev.intHomeScore, away: ev.intAwayScore },
-                        matchMins: parseInt(ev.intElapsed) || 0,
-                        idEvent: ev.idEvent,
-                        sport: 'football'
-                    }));
-                    events = [...events, ...tsEvents].slice(0, 15);
-                }
-            } catch (e) { console.error('TSDB Error:', e.message); }
-        }
-
-        console.log(`[+] Football events sent: ${events.length}`);
-        res.json({
-            success: true,
-            count: events.length,
-            events,
-            debug: { status: lastSofaStatus, error: lastSofaError }
-        });
-    } catch (error) {
-        console.error('[-] /api/football/live error:', error.message);
-        res.status(500).json({ success: false, error: error.message, events: [], debug: { error: error.message } });
+    let events = await fetchFootballLiveSofa();
+    if (!events || events.length === 0) {
+        events = await fetchFootballTSDB();
     }
-});
-
-app.get('/api/debug', async (req, res) => {
-    try {
-        console.log('[GET] /api/debug');
-        const data = await fetchSofa('/sport/football/events/live');
-        res.json({
-            success: true,
-            lastSofaStatus,
-            lastSofaError,
-            sampleData: data?.events ? data.events.slice(0, 1) : null
-        });
-    } catch (e) {
-        res.json({ success: false, error: e.message, lastSofaStatus, lastSofaError });
-    }
-});
-
-// ─── ENDPOINT: GENERIC EVENT DETAILS (Polling) ──────────────────────────────
-app.get('/api/event/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        console.log(`[GET] /api/event/${id}`);
-        const data = await fetchSofa(`/event/${id}`);
-        const ev = data?.event;
-        if (!ev) return res.status(404).json({ success: false, error: 'Event not found' });
-
-        const isTennis = (ev.sport?.slug === 'tennis');
-        const packed = isTennis ? packTennisEvent(ev, true) : packFootballEvent(ev, true);
-
-        res.json({ success: true, event: packed });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-
-// ─── ENDPOINT: SCREENSHOT + OCR (Nuclear Fallback) ──────────────────────────
-app.get('/api/screenshot', async (req, res) => {
-    const sport = req.query.sport || 'tennis';
-    console.log(`[OCR] Requesting screenshot for ${sport}...`);
-
-    if (!_browser) {
-        _browser = await chromium.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        });
-    }
-    const context = await _browser.newContext({
-        viewport: { width: 400, height: 900 },
-        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
-    });
-    const page = await context.newPage();
-    try {
-        const url = `https://www.sofascore.com/${sport}`;
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-        // Esperar a que los partidos aparezcan visualmente
-        await page.waitForTimeout(5000);
-
-        const screenshotPath = `screenshot-${sport}.png`;
-        await page.screenshot({ path: screenshotPath });
-        console.log(`[OCR] Screenshot saved: ${screenshotPath}`);
-
-        // OCR con Tesseract.js
-        const { data: { text } } = await Tesseract.recognize(screenshotPath, 'eng+spa');
-        console.log(`[OCR] Text extracted (${text.length} chars)`);
-
-        res.json({
-            success: true,
-            sport,
-            ocrText: text,
-            info: "Screenshot taken and OCR processed. Bypasses 403 API blocks."
-        });
-    } catch (e) {
-        res.status(500).json({ success: false, error: e.message });
-    } finally {
-        await page.close();
-        await context.close();
-    }
+    res.json({ success: true, count: events.length, events });
 });
 
 app.get('/', (req, res) => {
-    res.send('Bolita API 🎾⚽ · /api/tennis/live · /api/football/live');
+    res.send('Bolita API Ligera 🚀 · /api/tennis/live · /api/football/live');
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 API iniciada en puerto ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor ligero corriendo en puerto ${PORT}`);
 });
