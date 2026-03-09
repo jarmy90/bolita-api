@@ -30,10 +30,17 @@ function fetchSofa(path) {
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                try { resolve(JSON.parse(data)); }
+                try {
+                    if (res.statusCode !== 200) {
+                        console.error(`[-] Sofa Error ${res.statusCode}: ${data.slice(0, 100)}`);
+                        return resolve({ events: [] });
+                    }
+                    resolve(JSON.parse(data));
+                }
                 catch (e) { reject(new Error('JSON parse error: ' + data.slice(0, 200))); }
             });
         });
+
         req.on('error', reject);
         req.setTimeout(15000, () => { req.destroy(new Error('timeout')); });
         req.end();
@@ -114,8 +121,16 @@ app.get('/api/tennis/live', async (req, res) => {
         console.log('[GET] /api/tennis/live');
 
         // 1. Live matches
-        const liveData = await fetchSofa('/sport/tennis/events/live').catch(() => ({ events: [] }));
-        const liveEvents = (liveData?.events || []).filter(isAtpWtaSingles);
+        const liveData = await fetchSofa('/sport/tennis/events/live').catch(e => {
+            console.error('[-] Tennis Live Fetch Error:', e.message);
+            return { events: [] };
+        });
+
+        let liveEvents = (liveData?.events || []).filter(isAtpWtaSingles);
+        if (!liveEvents.length && liveData?.events?.length) {
+            console.log('[!] No ATP/WTA singles found, falling back to any live tennis');
+            liveEvents = liveData.events.slice(0, 10);
+        }
 
         // 2. Scheduled: today + tomorrow
         const dates = [0, 1].map(utcDates);
@@ -125,34 +140,25 @@ app.get('/api/tennis/live', async (req, res) => {
         const nowSec = Math.floor(Date.now() / 1000);
         const scheduledEvents = scheduledPacks
             .flatMap(p => p?.events || [])
-            .filter(e => e && e.id && isAtpWtaSingles(e) && (e.startTimestamp || 0) >= nowSec - 600);
+            .filter(e => e && e.id && (e.startTimestamp || 0) >= nowSec - 600);
 
         // 3. Merge (live first, then upcoming), deduplicate
         const seen = new Set(liveEvents.map(e => e.id));
-        const upcoming = scheduledEvents.filter(e => !seen.has(e.id));
+        const upcoming = scheduledEvents.filter(e => !seen.has(e.id)).slice(0, 10);
 
         const events = [
             ...liveEvents.map(e => packTennisEvent(e, true)),
             ...upcoming.map(e => packTennisEvent(e, false))
-        ].slice(0, 10);
+        ].slice(0, 15);
 
-        if (!events.length) {
-            // If no ATP/WTA, try any tennis live
-            const anyLive = (liveData?.events || []).filter(e => {
-                const catName = (e?.tournament?.category?.name || '').toLowerCase();
-                return catName.includes('tennis') || catName.includes('tenis');
-            });
-            if (anyLive.length) {
-                return res.json({ success: true, count: anyLive.length, events: anyLive.slice(0, 6).map(e => packTennisEvent(e, true)) });
-            }
-        }
-
+        console.log(`[+] Tennis events sent: ${events.length}`);
         res.json({ success: true, count: events.length, events });
     } catch (error) {
         console.error('[-] /api/tennis/live error:', error.message);
         res.status(500).json({ success: false, error: error.message, events: [] });
     }
 });
+
 
 // ─── Flashscore Football Scraper (Playwright) ───────────────────────────────
 async function scrapeFlashscoreFootball() {
@@ -217,18 +223,30 @@ app.get('/api/football/live', async (req, res) => {
         console.log('[GET] /api/football/live');
 
         // 1. Live matches
-        const liveData = await fetchSofa('/sport/football/events/live').catch(() => ({ events: [] }));
+        const liveData = await fetchSofa('/sport/football/events/live').catch(e => {
+            console.error('[-] Football Live Fetch Error:', e.message);
+            return { events: [] };
+        });
 
         // Filtrar por ligas importantes para evitar ruido
-        const importantLeagues = ['laliga', 'premier league', 'serie a', 'bundesliga', 'ligue 1', 'champions league', 'europa league', 'eredivisie', 'liga portugal'];
-        const liveEvents = (liveData?.events || []).filter(e => {
+        const importantLeagues = ['laliga', 'premier league', 'serie a', 'bundesliga', 'ligue 1', 'champions league', 'europa league', 'eredivisie', 'liga portugal', 'brazil', 'argentina', 'colombia', 'mexico', 'fa cup', 'copa del rey'];
+        let liveEvents = (liveData?.events || []).filter(e => {
             const t = (e?.tournament?.uniqueTournament?.name || e?.tournament?.name || '').toLowerCase();
             return importantLeagues.some(L => t.includes(L));
         });
 
+        // Fallback: si no hay "importantes", permitimos cualquier partido de ligas de primer nivel (Categoría "Soccer")
+        if (!liveEvents.length && liveData?.events?.length) {
+            console.log('[!] No "important" live matches, returning top 10 general live');
+            liveEvents = liveData.events.slice(0, 10);
+        }
+
         // 2. Scheduled today
         const today = utcDates(0);
-        const scheduledData = await fetchSofa(`/sport/football/scheduled-events/${today}`).catch(() => ({ events: [] }));
+        const scheduledData = await fetchSofa(`/sport/football/scheduled-events/${today}`).catch(e => {
+            console.error('[-] Football Scheduled Fetch Error:', e.message);
+            return { events: [] };
+        });
         const nowSec = Math.floor(Date.now() / 1000);
         const upcomingEvents = (scheduledData?.events || []).filter(e => {
             if (!e || (e.startTimestamp || 0) < nowSec - 600) return false;
@@ -237,18 +255,14 @@ app.get('/api/football/live', async (req, res) => {
         });
 
         const seen = new Set(liveEvents.map(e => e.id));
-        const finalUpcoming = upcomingEvents.filter(e => !seen.has(e.id));
+        const finalUpcoming = upcomingEvents.filter(e => !seen.has(e.id)).slice(0, 8);
 
         const events = [
             ...liveEvents.map(e => packFootballEvent(e, true)),
             ...finalUpcoming.map(e => packFootballEvent(e, false))
         ].slice(0, 15);
 
-        // Fallback: si no hay "importantes", devolvemos los 5 primeros live que haya
-        if (!events.length && liveData?.events?.length) {
-            return res.json({ success: true, count: 5, events: liveData.events.slice(0, 5).map(e => packFootballEvent(e, true)) });
-        }
-
+        console.log(`[+] Football events sent: ${events.length}`);
         res.json({ success: true, count: events.length, events });
     } catch (error) {
         console.error('[-] /api/football/live error:', error.message);
