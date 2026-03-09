@@ -72,9 +72,32 @@ function packTennisEvent(ev, isLive) {
         status: isLive ? (scoreLabel || 'En juego') : new Date((ev?.startTimestamp || 0) * 1000).toISOString(),
         isLive,
         score: sets ? { home: String(hs.current ?? ''), away: String(as.current ?? '') } : null,
-        sofaEventId: ev.id
+        sofaEventId: ev.id,
+        sport: 'tennis'
     };
 }
+
+// ─── Helper: Pack a SofaScore Football event ──────────────────────────────
+function packFootballEvent(ev, isLive) {
+    const hs = ev?.homeScore || {};
+    const as = ev?.awayScore || {};
+    const scoreText = `${hs.current ?? 0}-${as.current ?? 0}`;
+    const time = ev?.status?.description || ''; // e.g. "90'", "HT", "FT"
+    const elapsed = ev?.status?.type === 'inprogress' ? (parseInt(time) || 0) : 0;
+
+    return {
+        home: ev?.homeTeam?.shortName || ev?.homeTeam?.name || 'Local',
+        away: ev?.awayTeam?.shortName || ev?.awayTeam?.name || 'Visitante',
+        tournament: ev?.tournament?.uniqueTournament?.name || ev?.tournament?.name || '',
+        status: isLive ? (time || 'En juego') : new Date((ev?.startTimestamp || 0) * 1000).toISOString(),
+        isLive,
+        score: { home: String(hs.current ?? 0), away: String(as.current ?? 0) },
+        elapsed: elapsed,
+        sofaEventId: ev.id,
+        sport: 'football'
+    };
+}
+
 
 // ─── Helper: Today + Tomorrow in YYYY-MM-DD UTC ─────────────────────────────
 function utcDates(offsetDays = 0) {
@@ -188,17 +211,69 @@ async function scrapeFlashscoreFootball() {
     return matches;
 }
 
-// ─── ENDPOINT: FUTBOL LIVE (Playwright) ─────────────────────────────────────
+// ─── ENDPOINT: FUTBOL LIVE (SofaScore API) ──────────────────────────────────
 app.get('/api/football/live', async (req, res) => {
     try {
         console.log('[GET] /api/football/live');
-        const data = await scrapeFlashscoreFootball();
-        res.json({ success: true, count: data.length, events: data });
+
+        // 1. Live matches
+        const liveData = await fetchSofa('/sport/football/events/live').catch(() => ({ events: [] }));
+
+        // Filtrar por ligas importantes para evitar ruido
+        const importantLeagues = ['laliga', 'premier league', 'serie a', 'bundesliga', 'ligue 1', 'champions league', 'europa league', 'eredivisie', 'liga portugal'];
+        const liveEvents = (liveData?.events || []).filter(e => {
+            const t = (e?.tournament?.uniqueTournament?.name || e?.tournament?.name || '').toLowerCase();
+            return importantLeagues.some(L => t.includes(L));
+        });
+
+        // 2. Scheduled today
+        const today = utcDates(0);
+        const scheduledData = await fetchSofa(`/sport/football/scheduled-events/${today}`).catch(() => ({ events: [] }));
+        const nowSec = Math.floor(Date.now() / 1000);
+        const upcomingEvents = (scheduledData?.events || []).filter(e => {
+            if (!e || (e.startTimestamp || 0) < nowSec - 600) return false;
+            const t = (e?.tournament?.uniqueTournament?.name || e?.tournament?.name || '').toLowerCase();
+            return importantLeagues.some(L => t.includes(L));
+        });
+
+        const seen = new Set(liveEvents.map(e => e.id));
+        const finalUpcoming = upcomingEvents.filter(e => !seen.has(e.id));
+
+        const events = [
+            ...liveEvents.map(e => packFootballEvent(e, true)),
+            ...finalUpcoming.map(e => packFootballEvent(e, false))
+        ].slice(0, 15);
+
+        // Fallback: si no hay "importantes", devolvemos los 5 primeros live que haya
+        if (!events.length && liveData?.events?.length) {
+            return res.json({ success: true, count: 5, events: liveData.events.slice(0, 5).map(e => packFootballEvent(e, true)) });
+        }
+
+        res.json({ success: true, count: events.length, events });
     } catch (error) {
         console.error('[-] /api/football/live error:', error.message);
         res.status(500).json({ success: false, error: error.message, events: [] });
     }
 });
+
+// ─── ENDPOINT: GENERIC EVENT DETAILS (Polling) ──────────────────────────────
+app.get('/api/event/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`[GET] /api/event/${id}`);
+        const data = await fetchSofa(`/event/${id}`);
+        const ev = data?.event;
+        if (!ev) return res.status(404).json({ success: false, error: 'Event not found' });
+
+        const isTennis = (ev.sport?.slug === 'tennis');
+        const packed = isTennis ? packTennisEvent(ev, true) : packFootballEvent(ev, true);
+
+        res.json({ success: true, event: packed });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 
 app.get('/', (req, res) => {
     res.send('Bolita API 🎾⚽ · /api/tennis/live · /api/football/live');
