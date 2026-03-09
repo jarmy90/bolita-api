@@ -1,250 +1,207 @@
 const express = require('express');
 const { chromium } = require('playwright');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Enable CORS if your mobile app or web frontend needs to call it directly from a browser
+// ─── CORS ──────────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
 
-// Función de scraping encapsulada
-async function scrapeFlashscoreTennis() {
-    console.log('[+] Iniciando navegador Chrome Headless...');
-
-    // IMPORTANT: In cloud environments (Render, Heroku), we must run in headless mode
-    // and often need special args like --no-sandbox
-    const browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
-
-    // Simular un navegador real para evitar bloqueos
-    const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        viewport: { width: 1280, height: 720 }
-    });
-    const page = await context.newPage();
-
-    let matches = [];
-
-    try {
-        console.log('[+] Navegando a Flashscore Tennis...');
-        await page.goto('https://www.flashscore.es/tennis/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-        console.log('[+] Esperando renderizado de JavaScript (.event__match)...');
-        // Esperamos a que los partidos aparezcan en el DOM
-        await page.waitForSelector('.event__match', { timeout: 15000 }).catch(() => console.log('Timeout esperando .event__match'));
-
-        matches = await page.evaluate(() => {
-            const results = [];
-            const matchNodes = document.querySelectorAll('.event__match');
-
-            matchNodes.forEach(node => {
-                // Jugadores
-                const homeNode = node.querySelector('.event__participant--home');
-                const awayNode = node.querySelector('.event__participant--away');
-                const home = homeNode ? homeNode.textContent.trim() : 'Jugador 1';
-                const away = awayNode ? awayNode.textContent.trim() : 'Jugador 2';
-
-                // Torneo asociado a este partido (buscando hacia atrás)
-                let tournament = 'Desconocido';
-                let prev = node.previousElementSibling;
-                while (prev) {
-                    if (prev.classList.contains('event__header')) {
-                        const tNode = prev.querySelector('.event__title--name');
-                        tournament = tNode ? tNode.textContent.trim() : 'Desconocido';
-                        break;
-                    }
-                    if (prev.classList.contains('event__match')) { }
-                    prev = prev.previousElementSibling;
-                }
-
-                // Estado actual del partido (Live vs Próximo vs Finalizado)
-                const stageNode = node.querySelector('.event__stage');
-                const timeNode = node.querySelector('.event__time');
-                const isLive = node.classList.contains('event__match--live') || !!stageNode;
-                const isFinished = node.classList.contains('event__match--finished') || node.classList.contains('event__match--twoLine');
-
-                let status = '';
-                if (isLive) {
-                    status = stageNode ? stageNode.textContent.trim() : 'En juego';
-                } else if (timeNode && !isFinished) {
-                    status = timeNode.textContent.trim(); // ej: "20:30"
-                } else {
-                    status = 'Finalizado';
-                }
-
-                // Puntuaciones (Nuevo DOM de Flashscore)
-                const homeSetsNode = node.querySelector('.event__score--home');
-                const awaySetsNode = node.querySelector('.event__score--away');
-                const homeSets = homeSetsNode ? homeSetsNode.textContent.trim() : '0';
-                const awaySets = awaySetsNode ? awaySetsNode.textContent.trim() : '0';
-
-                // Juegos por set
-                const homeParts = Array.from(node.querySelectorAll('.event__part--home')).map(n => n.textContent.trim());
-                const awayParts = Array.from(node.querySelectorAll('.event__part--away')).map(n => n.textContent.trim());
-
-                results.push({
-                    tournament,
-                    home,
-                    away,
-                    status,
-                    isLive,
-                    isFinished,
-                    score: {
-                        sets: { home: homeSets, away: awaySets },
-                        games: { home: homeParts, away: awayParts }
-                    }
-                });
+// ─── Helper: Fetch JSON from SofaScore (works fine server-side) ─────────────
+function fetchSofa(path) {
+    return new Promise((resolve, reject) => {
+        const options = {
+            hostname: 'api.sofascore.com',
+            path: '/api/v1' + path,
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://www.sofascore.com/',
+                'Origin': 'https://www.sofascore.com'
+            }
+        };
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try { resolve(JSON.parse(data)); }
+                catch (e) { reject(new Error('JSON parse error: ' + data.slice(0, 200))); }
             });
-
-            return results;
         });
-
-        console.log(`[+] Recuperados ${matches.length} partidos de Tenis.`);
-    } catch (e) {
-        console.error('[-] Error durante el scraping:', e.message);
-        throw e; // Lanzar para manejarlo en el endpoint
-    } finally {
-        await browser.close();
-    }
-
-    return matches;
+        req.on('error', reject);
+        req.setTimeout(15000, () => { req.destroy(new Error('timeout')); });
+        req.end();
+    });
 }
 
-// Función de scraping de Fútbol (Goles, Tarjetas, Córners)
-async function scrapeFlashscoreFootball() {
-    console.log('[+] Iniciando navegador Chrome Headless para Fútbol...');
-    const browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
-
-    const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        viewport: { width: 1280, height: 720 }
-    });
-    const page = await context.newPage();
-    let matches = [];
-
-    try {
-        console.log('[+] Navegando a Flashscore Fútbol...');
-        await page.goto('https://www.flashscore.es/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        console.log('[+] Esperando renderizado (.event__match)...');
-        await page.waitForSelector('.event__match', { timeout: 15000 }).catch(() => console.log('Timeout esperando .event__match'));
-
-        matches = await page.evaluate(() => {
-            const results = [];
-            const matchNodes = document.querySelectorAll('.event__match');
-
-            matchNodes.forEach(node => {
-                // Filtro rápido por ligas principales (LaLiga, Premier, Champions) si queremos
-                let tournament = 'Desconocido';
-                let prev = node.previousElementSibling;
-                while (prev) {
-                    if (prev.classList.contains('event__header')) {
-                        const tNode = prev.querySelector('.event__title--name');
-                        tournament = tNode ? tNode.textContent.trim() : 'Desconocido';
-                        break;
-                    }
-                    if (prev.classList.contains('event__match')) { }
-                    prev = prev.previousElementSibling;
-                }
-
-                const txtT = tournament.toLowerCase();
-                // Opcional: Solo traer las ligas top pedidas por el usuario
-                const isWanted = txtT.includes('laliga') || txtT.includes('premier league') || txtT.includes('champions league') || txtT.includes('primera');
-
-                const homeNode = node.querySelector('.event__participant--home');
-                const awayNode = node.querySelector('.event__participant--away');
-                const home = homeNode ? homeNode.textContent.trim() : 'Equipo 1';
-                const away = awayNode ? awayNode.textContent.trim() : 'Equipo 2';
-
-                const stageNode = node.querySelector('.event__stage');
-                const timeNode = node.querySelector('.event__time');
-                const isLive = node.classList.contains('event__match--live') || !!stageNode;
-                const isFinished = node.classList.contains('event__match--finished');
-
-                let status = '';
-                if (isLive) status = stageNode ? stageNode.textContent.trim() : 'En juego';
-                else if (timeNode && !isFinished) status = timeNode.textContent.trim();
-                else status = 'Finalizado';
-
-                // Goles
-                const homeScoreNode = node.querySelector('.event__score--home');
-                const awayScoreNode = node.querySelector('.event__score--away');
-                const homeScore = homeScoreNode ? homeScoreNode.textContent.trim() : '0';
-                const awayScore = awayScoreNode ? awayScoreNode.textContent.trim() : '0';
-
-                // Tarjetas rojas (visibles desde la vista general en Flashscore)
-                const homeRed = node.querySelector('.event__participant--home ~ .icn--card-red') ? 1 : 0;
-                const awayRed = node.querySelector('.event__participant--away ~ .icn--card-red') ? 1 : 0;
-
-                results.push({
-                    tournament,
-                    home,
-                    away,
-                    status,
-                    isLive,
-                    isFinished,
-                    wanted: isWanted,
-                    score: {
-                        home: homeScore,
-                        away: awayScore
-                    },
-                    cards: {
-                        red: { home: homeRed, away: awayRed }
-                    }
-                });
-            });
-            return results;
-        });
-
-        // Opcional: Si queríamos córners hay que entrar en el detalle del partido, lo cual ralentiza mucho.
-        // Devolvemos la lista limpia.
-        console.log(`[+] Recuperados ${matches.length} partidos de Fútbol.`);
-    } catch (e) {
-        console.error('[-] Error scraping Fútbol:', e.message);
-        throw e;
-    } finally {
-        await browser.close();
-    }
-    return matches;
+// ─── Helper: Is ATP/WTA single ───────────────────────────────────────────────
+function isAtpWtaSingles(event) {
+    const catSlug = (event?.tournament?.category?.slug || '').toLowerCase();
+    const catName = (event?.tournament?.category?.name || '').toLowerCase();
+    const isAtpWta = catSlug === 'atp' || catSlug.startsWith('wta') || catName.includes('atp') || catName.includes('wta');
+    if (!isAtpWta) return false;
+    // Exclude doubles
+    const home = event?.homeTeam?.name || event?.homeTeam?.shortName || '';
+    const away = event?.awayTeam?.name || event?.awayTeam?.shortName || '';
+    if (home.includes(' / ') || away.includes(' / ')) return false;
+    return true;
 }
 
-// ENDPOINT TENIS
+// ─── Helper: Pack a SofaScore event into our standard format ────────────────
+function packTennisEvent(ev, isLive) {
+    const hs = ev?.homeScore || {};
+    const as = ev?.awayScore || {};
+    const sets = (Number.isFinite(hs.current) && Number.isFinite(as.current))
+        ? `${hs.current}-${as.current}` : null;
+    const ph = [hs.period1, hs.period2, hs.period3, hs.period4, hs.period5].filter(Number.isFinite);
+    const pa = [as.period1, as.period2, as.period3, as.period4, as.period5].filter(Number.isFinite);
+    let games = null;
+    if (ph.length && pa.length) games = `${ph[ph.length - 1]}-${pa[pa.length - 1]}`;
+    const scoreLabel = sets ? (games ? `Sets ${sets} · Games ${games}` : `Sets ${sets}`) : (games || '');
+
+    return {
+        home: ev?.homeTeam?.shortName || ev?.homeTeam?.name || 'Jugador 1',
+        away: ev?.awayTeam?.shortName || ev?.awayTeam?.name || 'Jugador 2',
+        tournament: ev?.tournament?.uniqueTournament?.name || ev?.tournament?.name || '',
+        status: isLive ? (scoreLabel || 'En juego') : new Date((ev?.startTimestamp || 0) * 1000).toISOString(),
+        isLive,
+        score: sets ? { home: String(hs.current ?? ''), away: String(as.current ?? '') } : null,
+        sofaEventId: ev.id
+    };
+}
+
+// ─── Helper: Today + Tomorrow in YYYY-MM-DD UTC ─────────────────────────────
+function utcDates(offsetDays = 0) {
+    const d = new Date(Date.now() + offsetDays * 86400000);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+// ─── ENDPOINT: TENIS LIVE + PRÓXIMOS (SofaScore direct fetch) ───────────────
 app.get('/api/tennis/live', async (req, res) => {
     try {
-        console.log(`[GET] Petición a /api/tennis/live`);
-        const data = await scrapeFlashscoreTennis();
-        res.status(200).json({ success: true, count: data.length, events: data });
+        console.log('[GET] /api/tennis/live');
+
+        // 1. Live matches
+        const liveData = await fetchSofa('/sport/tennis/events/live').catch(() => ({ events: [] }));
+        const liveEvents = (liveData?.events || []).filter(isAtpWtaSingles);
+
+        // 2. Scheduled: today + tomorrow
+        const dates = [0, 1].map(utcDates);
+        const scheduledPacks = await Promise.all(dates.map(d =>
+            fetchSofa(`/sport/tennis/scheduled-events/${d}`).catch(() => ({ events: [] }))
+        ));
+        const nowSec = Math.floor(Date.now() / 1000);
+        const scheduledEvents = scheduledPacks
+            .flatMap(p => p?.events || [])
+            .filter(e => e && e.id && isAtpWtaSingles(e) && (e.startTimestamp || 0) >= nowSec - 600);
+
+        // 3. Merge (live first, then upcoming), deduplicate
+        const seen = new Set(liveEvents.map(e => e.id));
+        const upcoming = scheduledEvents.filter(e => !seen.has(e.id));
+
+        const events = [
+            ...liveEvents.map(e => packTennisEvent(e, true)),
+            ...upcoming.map(e => packTennisEvent(e, false))
+        ].slice(0, 10);
+
+        if (!events.length) {
+            // If no ATP/WTA, try any tennis live
+            const anyLive = (liveData?.events || []).filter(e => {
+                const catName = (e?.tournament?.category?.name || '').toLowerCase();
+                return catName.includes('tennis') || catName.includes('tenis');
+            });
+            if (anyLive.length) {
+                return res.json({ success: true, count: anyLive.length, events: anyLive.slice(0, 6).map(e => packTennisEvent(e, true)) });
+            }
+        }
+
+        res.json({ success: true, count: events.length, events });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        console.error('[-] /api/tennis/live error:', error.message);
+        res.status(500).json({ success: false, error: error.message, events: [] });
     }
 });
 
-// ENDPOINT FUTBOL
+// ─── Flashscore Football Scraper (Playwright) ───────────────────────────────
+async function scrapeFlashscoreFootball() {
+    console.log('[+] Scraping Flashscore for Football...');
+    const browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
+    const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        viewport: { width: 1280, height: 720 }
+    });
+    const page = await context.newPage();
+    let matches = [];
+
+    try {
+        await page.goto('https://www.flashscore.es/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.waitForSelector('.event__match', { timeout: 15000 }).catch(() => { });
+
+        matches = await page.evaluate(() => {
+            const results = [];
+            const nodes = document.querySelectorAll('.event__match');
+            nodes.forEach(node => {
+                let tournament = 'Desconocido';
+                let prev = node.previousElementSibling;
+                while (prev) {
+                    if (prev.classList.contains('event__header')) {
+                        const t = prev.querySelector('.event__title--name');
+                        tournament = t ? t.textContent.trim() : '';
+                        break;
+                    }
+                    prev = prev.previousElementSibling;
+                }
+                const txtT = tournament.toLowerCase();
+                const isWanted = txtT.includes('laliga') || txtT.includes('primera') || txtT.includes('premier league') || txtT.includes('champions') || txtT.includes('liga española');
+                if (!isWanted) return;
+
+                const home = node.querySelector('.event__participant--home')?.textContent.trim() || 'Local';
+                const away = node.querySelector('.event__participant--away')?.textContent.trim() || 'Visitante';
+                const stageNode = node.querySelector('.event__stage');
+                const timeNode = node.querySelector('.event__time');
+                const isLive = node.classList.contains('event__match--live') || !!stageNode;
+                const status = isLive ? (stageNode?.textContent.trim() || 'En juego') : (timeNode?.textContent.trim() || '');
+                const homeScore = node.querySelector('.event__score--home')?.textContent.trim() || '0';
+                const awayScore = node.querySelector('.event__score--away')?.textContent.trim() || '0';
+                results.push({ tournament, home, away, status, isLive, score: { home: homeScore, away: awayScore } });
+            });
+            return results;
+        });
+        console.log(`[+] Football matches: ${matches.length}`);
+    } catch (e) {
+        console.error('[-] Football scraping error:', e.message);
+    } finally {
+        await browser.close();
+    }
+    return matches;
+}
+
+// ─── ENDPOINT: FUTBOL LIVE (Playwright) ─────────────────────────────────────
 app.get('/api/football/live', async (req, res) => {
     try {
-        console.log(`[GET] Petición a /api/football/live`);
-        let data = await scrapeFlashscoreFootball();
-        // Filtrar por ligas pedidas o devolver todo configurando un ?all=true
-        if (req.query.wanted !== 'false') {
-            const f = data.filter(m => m.wanted || m.isLive); // Priorizamos los pedidos en directo + los que matchean
-            if (f.length > 0) data = f;
-        }
-        res.status(200).json({ success: true, count: data.length, events: data });
+        console.log('[GET] /api/football/live');
+        const data = await scrapeFlashscoreFootball();
+        res.json({ success: true, count: data.length, events: data });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        console.error('[-] /api/football/live error:', error.message);
+        res.status(500).json({ success: false, error: error.message, events: [] });
     }
 });
 
 app.get('/', (req, res) => {
-    res.send('API Node.js + Playwright 🎾⚽ endpoints: /api/tennis/live, /api/football/live');
+    res.send('Bolita API 🎾⚽ · /api/tennis/live · /api/football/live');
 });
 
 app.listen(PORT, () => {
