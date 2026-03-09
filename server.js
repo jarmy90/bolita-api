@@ -14,7 +14,66 @@ app.use((req, res, next) => {
     next();
 });
 
-// ─── Playwright Helper (Stealth Fetch) ──────────────────────────────────────
+// ─── TennisLive Helper (Stealth Scrape) ─────────────────────────────────────
+async function scrapeTennisLive() {
+    if (!_browser) {
+        _browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
+    }
+    const context = await _browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    });
+    const page = await context.newPage();
+    try {
+        console.log('[TennisLive] Navigating to tennislive.net...');
+        await page.goto('https://www.tennislive.net/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+        const matches = await page.evaluate(() => {
+            const results = [];
+            // Buscamos los contenedores de partidos en vivo o del día
+            const rows = document.querySelectorAll('table.table_stats_match tr');
+
+            rows.forEach(row => {
+                const homeLink = row.querySelector('td.player1 a');
+                const awayLink = row.querySelector('td.player2 a');
+                if (!homeLink || !awayLink) return;
+
+                const home = homeLink.getAttribute('title') || homeLink.textContent.trim();
+                const away = awayLink.getAttribute('title') || awayLink.textContent.trim();
+
+                // Marcador de sets (ej: 6-4, 3-2)
+                const scores = Array.from(row.querySelectorAll('td.score')).map(td => td.textContent.trim()).filter(s => s !== '');
+                const currentPoints = row.querySelector('td.points')?.textContent.trim() || '';
+
+                // Indicador "En Vivo" (punto amarillo/clase activa)
+                const isLive = !!row.querySelector('td.live_score_ongoing') || currentPoints !== '';
+
+                results.push({
+                    home,
+                    away,
+                    tournament: 'Tennis Live',
+                    status: isLive ? (currentPoints ? `Points: ${currentPoints}` : 'En juego') : 'Upcoming',
+                    isLive,
+                    score: scores.length >= 2 ? { home: scores[0], away: scores[1] } : null,
+                    sport: 'tennis',
+                    sofaEventId: 'tl_' + Math.random().toString(36).substr(2, 9) // ID temporal para polling
+                });
+            });
+            return results;
+        });
+
+        console.log(`[TennisLive] Extracted ${matches.length} matches.`);
+        return matches;
+    } catch (e) {
+        console.error('[TennisLive] Error:', e.message);
+        return [];
+    } finally {
+        await page.close();
+        await context.close();
+    }
+}
 let _browser = null;
 async function fetchSofaPlaywright(path) {
     if (!_browser) {
@@ -163,64 +222,18 @@ function utcDates(offsetDays = 0) {
     return `${y}-${m}-${day}`;
 }
 
-// ─── ENDPOINT: TENIS LIVE + PRÓXIMOS (SofaScore direct fetch) ───────────────
+// ─── ENDPOINT: TENIS LIVE (TennisLive.net Scraper) ──────────────────────────
 app.get('/api/tennis/live', async (req, res) => {
     try {
-        console.log('[GET] /api/tennis/live');
+        console.log('[GET] /api/tennis/live (TennisLive.net)');
 
-        // 1. Live matches
-        const liveData = await fetchSofa('/sport/tennis/events/live').catch(e => {
-            console.error('[-] Tennis Live Fetch Error:', e.message);
-            return { events: [] };
-        });
+        let events = await scrapeTennisLive();
 
-        let liveEvents = (liveData?.events || []).filter(isAtpWtaSingles);
-        if (!liveEvents.length && liveData?.events?.length) {
-            console.log('[!] No ATP/WTA singles found, falling back to any live tennis');
-            liveEvents = liveData.events.slice(0, 10);
-        }
-
-        // 2. Scheduled: today + tomorrow
-        const dates = [0, 1].map(utcDates);
-        const scheduledPacks = await Promise.all(dates.map(d =>
-            fetchSofa(`/sport/tennis/scheduled-events/${d}`).catch(() => ({ events: [] }))
-        ));
-        const nowSec = Math.floor(Date.now() / 1000);
-        const scheduledEvents = scheduledPacks
-            .flatMap(p => p?.events || [])
-            .filter(e => e && e.id && (e.startTimestamp || 0) >= nowSec - 600);
-
-        // 3. Merge (live first, then upcoming), deduplicate
-        const seen = new Set(liveEvents.map(e => e.id));
-        const upcoming = scheduledEvents.filter(e => !seen.has(e.id)).slice(0, 10);
-
-        let events = [
-            ...liveEvents.map(e => packTennisEvent(e, true)),
-            ...upcoming.map(e => packTennisEvent(e, false))
-        ].slice(0, 15);
-
-        // Fallback: TheSportsDB si SofaScore falla
+        // Fallback: Si TennisLive falla o está vacío, intentamos SofaScore como último recurso
         if (!events.length) {
-            console.log('[!] Tennis: SofaScore 403/Empty, attempting TheSportsDB fallback...');
-            try {
-                const resTS = await new Promise(r => {
-                    https.get('https://www.thesportsdb.com/api/v1/json/3/livescore.php?s=Tennis', (res) => {
-                        let d = ''; res.on('data', c => d += c); res.on('end', () => r(JSON.parse(d)));
-                    }).on('error', () => r(null));
-                });
-                if (resTS?.events) {
-                    events = resTS.events.map(ev => ({
-                        home: ev.strHomeTeam,
-                        away: ev.strAwayTeam,
-                        tournament: ev.strLeague,
-                        status: ev.strStatus,
-                        isLive: true,
-                        score: { home: ev.intHomeScore, away: ev.intAwayScore },
-                        idEvent: ev.idEvent,
-                        sport: 'tennis'
-                    }));
-                }
-            } catch (e) { }
+            console.log('[!] TennisLive empty, falling back to SofaScore...');
+            const liveData = await fetchSofa('/sport/tennis/events/live').catch(() => ({ events: [] }));
+            events = (liveData?.events || []).map(e => packTennisEvent(e, true));
         }
 
         console.log(`[+] Tennis events sent: ${events.length}`);
@@ -228,11 +241,11 @@ app.get('/api/tennis/live', async (req, res) => {
             success: true,
             count: events.length,
             events,
-            debug: { status: lastSofaStatus, error: lastSofaError }
+            debug: { source: events.length > 0 ? 'tennislive' : 'fallback' }
         });
     } catch (error) {
         console.error('[-] /api/tennis/live error:', error.message);
-        res.status(500).json({ success: false, error: error.message, events: [], debug: { error: error.message } });
+        res.status(500).json({ success: false, error: error.message, events: [] });
     }
 });
 
