@@ -12,12 +12,42 @@ app.use((req, res, next) => {
     next();
 });
 
-// ─── Helper: Fetch JSON from SofaScore (works fine server-side) ─────────────
+// ─── Playwright Helper (Stealth Fetch) ──────────────────────────────────────
+let _browser = null;
+async function fetchSofaPlaywright(path) {
+    if (!_browser) {
+        _browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
+    }
+    const context = await _browser.newContext({
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
+    });
+    const page = await context.newPage();
+    try {
+        const url = 'https://api.sofascore.com/api/v1' + path;
+        console.log(`[PW] Fetching ${url}...`);
+        const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+        if (response.status() === 200) {
+            return await response.json();
+        } else {
+            console.error(`[PW] Error ${response.status()}: ${path}`);
+            return { events: [] };
+        }
+    } catch (e) {
+        console.error(`[PW] Exception: ${e.message}`);
+        return { events: [] };
+    } finally {
+        await page.close();
+        await context.close();
+    }
+}
 let lastSofaStatus = 200;
 let lastSofaError = null;
 
 function fetchSofa(path) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         lastSofaError = null;
         const options = {
             hostname: 'api.sofascore.com',
@@ -26,15 +56,23 @@ function fetchSofa(path) {
             headers: {
                 'Accept': 'application/json',
                 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
-                'Cache-Control': 'no-cache'
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Host': 'api.sofascore.com'
             }
         };
         const req = https.request(options, (res) => {
             lastSofaStatus = res.statusCode;
             let data = '';
             res.on('data', chunk => data += chunk);
-            res.on('end', () => {
+            res.on('end', async () => {
                 try {
+                    if (res.statusCode === 403 || res.statusCode === 429) {
+                        console.warn(`[!] Sofa ${res.statusCode} detectado. Usando Playwright Fallback...`);
+                        const pwData = await fetchSofaPlaywright(path);
+                        return resolve(pwData);
+                    }
                     if (res.statusCode !== 200) {
                         lastSofaError = `Sofa Error ${res.statusCode}`;
                         console.error(`[-] Sofa Error ${res.statusCode}: ${data.slice(0, 100)}`);
@@ -154,10 +192,34 @@ app.get('/api/tennis/live', async (req, res) => {
         const seen = new Set(liveEvents.map(e => e.id));
         const upcoming = scheduledEvents.filter(e => !seen.has(e.id)).slice(0, 10);
 
-        const events = [
+        let events = [
             ...liveEvents.map(e => packTennisEvent(e, true)),
             ...upcoming.map(e => packTennisEvent(e, false))
         ].slice(0, 15);
+
+        // Fallback: TheSportsDB si SofaScore falla
+        if (!events.length) {
+            console.log('[!] Tennis: SofaScore 403/Empty, attempting TheSportsDB fallback...');
+            try {
+                const resTS = await new Promise(r => {
+                    https.get('https://www.thesportsdb.com/api/v1/json/3/livescore.php?s=Tennis', (res) => {
+                        let d = ''; res.on('data', c => d += c); res.on('end', () => r(JSON.parse(d)));
+                    }).on('error', () => r(null));
+                });
+                if (resTS?.events) {
+                    events = resTS.events.map(ev => ({
+                        home: ev.strHomeTeam,
+                        away: ev.strAwayTeam,
+                        tournament: ev.strLeague,
+                        status: ev.strStatus,
+                        isLive: true,
+                        score: { home: ev.intHomeScore, away: ev.intAwayScore },
+                        idEvent: ev.idEvent,
+                        sport: 'tennis'
+                    }));
+                }
+            } catch (e) { }
+        }
 
         console.log(`[+] Tennis events sent: ${events.length}`);
         res.json({
@@ -270,10 +332,36 @@ app.get('/api/football/live', async (req, res) => {
         const seen = new Set(liveEvents.map(e => e.id));
         const finalUpcoming = upcomingEvents.filter(e => !seen.has(e.id)).slice(0, 8);
 
-        const events = [
+        let events = [
             ...liveEvents.map(e => packFootballEvent(e, true)),
             ...finalUpcoming.map(e => packFootballEvent(e, false))
         ].slice(0, 15);
+
+        // Fallback: TheSportsDB si SofaScore falla (403 detectado)
+        if (!events.length || lastSofaStatus !== 200) {
+            console.log('[!] Football: SofaScore 403/Empty, attempting TheSportsDB fallback...');
+            try {
+                const resTS = await new Promise(r => {
+                    https.get('https://www.thesportsdb.com/api/v1/json/3/livescore.php?s=Soccer', (res) => {
+                        let d = ''; res.on('data', c => d += c); res.on('end', () => r(JSON.parse(d)));
+                    }).on('error', () => r(null));
+                });
+                if (resTS?.events) {
+                    const tsEvents = resTS.events.map(ev => ({
+                        home: ev.strHomeTeam,
+                        away: ev.strAwayTeam,
+                        tournament: ev.strLeague,
+                        status: ev.strStatus + (ev.intElapsed ? ` ${ev.intElapsed}'` : ''),
+                        isLive: true,
+                        score: { home: ev.intHomeScore, away: ev.intAwayScore },
+                        matchMins: parseInt(ev.intElapsed) || 0,
+                        idEvent: ev.idEvent,
+                        sport: 'football'
+                    }));
+                    events = [...events, ...tsEvents].slice(0, 15);
+                }
+            } catch (e) { console.error('TSDB Error:', e.message); }
+        }
 
         console.log(`[+] Football events sent: ${events.length}`);
         res.json({
