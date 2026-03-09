@@ -1,6 +1,8 @@
 const express = require('express');
 const { chromium } = require('playwright');
 const https = require('https');
+const Tesseract = require('tesseract.js');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -409,6 +411,51 @@ app.get('/api/event/:id', async (req, res) => {
     }
 });
 
+
+// ─── ENDPOINT: SCREENSHOT + OCR (Nuclear Fallback) ──────────────────────────
+app.get('/api/screenshot', async (req, res) => {
+    const sport = req.query.sport || 'tennis';
+    console.log(`[OCR] Requesting screenshot for ${sport}...`);
+
+    if (!_browser) {
+        _browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        });
+    }
+    const context = await _browser.newContext({
+        viewport: { width: 400, height: 900 },
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1'
+    });
+    const page = await context.newPage();
+    try {
+        const url = `https://www.sofascore.com/${sport}`;
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+        // Esperar a que los partidos aparezcan visualmente
+        await page.waitForTimeout(5000);
+
+        const screenshotPath = `screenshot-${sport}.png`;
+        await page.screenshot({ path: screenshotPath });
+        console.log(`[OCR] Screenshot saved: ${screenshotPath}`);
+
+        // OCR con Tesseract.js
+        const { data: { text } } = await Tesseract.recognize(screenshotPath, 'eng+spa');
+        console.log(`[OCR] Text extracted (${text.length} chars)`);
+
+        res.json({
+            success: true,
+            sport,
+            ocrText: text,
+            info: "Screenshot taken and OCR processed. Bypasses 403 API blocks."
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    } finally {
+        await page.close();
+        await context.close();
+    }
+});
 
 app.get('/', (req, res) => {
     res.send('Bolita API 🎾⚽ · /api/tennis/live · /api/football/live');
