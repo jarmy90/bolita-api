@@ -1,0 +1,8 @@
+{
+    "rewrites": [
+      {
+        "source": "/api/(.*)",
+        "destination": "/api/bolita.js?path=/$1"
+      }
+    ]
+}

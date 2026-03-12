@@ -1870,11 +1870,9 @@
     // 🎾 TENIS & ⚽ FUTBOL — Cloudflare Worker API
     // ─────────────────────────────────────────────────────────
     // Default to our verified worker URL
-    // ✅ VERCEL MIGRATION: La API y la web están 100% alojadas juntas en Vercel.
-    // Usar '/api' como ruta relativa evita TODOS los problemas de CORS y bloqueos.
-    let PW_API_URL = '/api';
+    // ✅ VERCEL FIX: Usamos un archivo simple 'bolita.js' para evitar bugs de build en Vercel.
+    let PW_API_URL = '/api/bolita.js';
     
-    // Si necesitas override para desarrollo local:
     const overrideApi = localStorage.getItem('PW_API_URL');
     if (overrideApi) PW_API_URL = overrideApi;
 
@@ -1882,7 +1880,16 @@
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort('timeout'), 20000);
-        const url = `${PW_API_URL}${endpoint}`;
+        
+        let url = PW_API_URL;
+        if (PW_API_URL.includes('bolita')) {
+            // El endpoint siempre empieza por '/' (ej: /tennis/live)
+            // Se lo pasamos a Vercel como variable ?path=/tennis/live
+            url = `${PW_API_URL}?path=${encodeURIComponent(endpoint)}`;
+        } else {
+            url = `${PW_API_URL}${endpoint}`;
+        }
+
         const res = await fetch(url, { signal: ctrl.signal });
         clearTimeout(t);
         if (!res.ok) {
@@ -3446,12 +3453,11 @@
       
       try {
         // 1. Check version/connectivity
-        const t1 = await fetch(`${PW_API_URL}/test?nocache=1&_=${Date.now()}`).then(r => r.json()).catch(() => null);
+        const t1 = await PW_fetch_json(`/test?nocache=1&_=${Date.now()}`).catch(() => null);
         const version = t1?.version || "V1.0 (Sin soporte Perfection)";
         
         // 2. Full Debug
-        const res = await fetch(`${PW_API_URL}/debug?nocache=1&_=${Date.now()}`);
-        const d = await res.json();
+        const d = await PW_fetch_json(`/debug?nocache=1&_=${Date.now()}`);
         
         if (d && d.success) {
           const r = d.results || {};
