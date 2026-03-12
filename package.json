@@ -1,0 +1,10 @@
+{
+  "name": "bolita-api",
+  "version": "1.0.0",
+  "description": "API for Bolita",
+  "main": "api/bolita.js",
+  "scripts": {
+    "start": "node api/bolita.js"
+  },
+  "dependencies": {}
+}
