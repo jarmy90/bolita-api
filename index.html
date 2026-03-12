@@ -1,0 +1,4026 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>BOLITA – Dominio en Vivo · </title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ── RESET & BASE ── */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      font-family: 'Sora', sans-serif;
+      background: #06142E;
+      color: #EAF2FF;
+      overflow: hidden
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh
+    }
+
+    /* ── TOP BAR ── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 12px;
+      background: #06142Eee;
+      border-bottom: 1px solid rgba(255, 255, 255, .07);
+      flex-shrink: 0;
+      gap: 8px;
+      z-index: 99999;
+      position: relative;
+      pointer-events: auto;
+
+    }
+
+    .logo {
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: -.04em
+    }
+
+    .logo span {
+      color: #FFD400
+    }
+
+    .sport-tabs {
+      display: flex;
+      gap: 5px
+    }
+
+    .stab {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border: 1px solid rgba(255, 255, 255, .13);
+      background: rgba(255, 255, 255, .06);
+      cursor: pointer;
+      color: #fff;
+      transition: .15s
+    }
+
+    .stab.on {
+      background: rgba(255, 255, 255, .18);
+      border-color: rgba(255, 255, 255, .25)
+    }
+
+    .dot6 {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block
+    }
+
+    .cbox {
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .cbox .lbl {
+      font-size: 7px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: rgba(255, 212, 0, .75);
+      letter-spacing: .1em;
+      line-height: 1
+    }
+
+    .cbox .val {
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1
+    }
+
+    .btn-plus {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #FFD400;
+      color: #000;
+      font-weight: 900;
+      font-size: 18px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .1);
+      border: 1.5px solid rgba(255, 255, 255, .2);
+      overflow: hidden;
+      cursor: pointer;
+      flex-shrink: 0
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover
+    }
+
+    /* ── SCOREBOARD ── */
+    #scoreboard {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 10px;
+      background: rgba(255, 255, 255, .04);
+      border-bottom: 1px solid rgba(255, 255, 255, .06);
+      flex-shrink: 0;
+      gap: 6px
+    }
+
+    .tblock {
+      flex: 1;
+      min-width: 0
+    }
+
+    .tblock .lbl {
+      font-size: 7px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: rgba(255, 255, 255, .3);
+      letter-spacing: .08em
+    }
+
+    .tblock .nm {
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.1
+    }
+
+    .tblock.r {
+      text-align: right
+    }
+
+    .scenter {
+      text-align: center;
+      flex-shrink: 0;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, .08);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, .1)
+    }
+
+    .live-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      margin-bottom: 2px
+    }
+
+    .ldot {
+      width: 5px;
+      height: 5px;
+      background: #ff4d4d;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: .7
+      }
+
+      50% {
+        transform: scale(1.3);
+        opacity: 1
+      }
+    }
+
+    .ltxt {
+      font-size: 7px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, .45)
+    }
+
+    #live-score {
+      font-size: 19px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      line-height: 1
+    }
+
+    #match-time {
+      font-size: 8px;
+      color: rgba(255, 255, 255, .4);
+      font-variant-numeric: tabular-nums
+    }
+
+    /* ── PITCH ── */
+    #pitch {
+      flex: 1;
+      position: relative;
+      overflow: hidden
+    }
+
+    #pitch-visual::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, #1a5c2a 0%, #1e6b30 25%, #1a5c2a 50%, #1e6b30 75%, #1a5c2a 100%);
+      z-index: 0;
+      transition: background .5s
+    }
+
+    /* ── TENNIS COURT OVERLAY ── */
+    #tennis-court {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: none;
+      background: #3e7bb6;
+      overflow: hidden;
+      box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.5);
+    }
+
+    #tennis-court.active {
+      display: block;
+    }
+
+    .tc-play-area {
+      position: absolute;
+      top: 8%;
+      bottom: 8%;
+      left: 10%;
+      right: 10%;
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      box-sizing: border-box;
+      display: none; /* Quitamos las lineas blancas de tenis */
+    }
+
+    .tc-net {
+      position: absolute;
+      top: 50%;
+      left: -6%;
+      right: -6%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+      transform: translateY(-50%);
+      z-index: 2;
+    }
+
+    .tc-net::before,
+    .tc-net::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      width: 6px;
+      height: 8px;
+      background: #aaa;
+      border-radius: 2px;
+    }
+
+    .tc-net::before {
+      left: 0;
+    }
+
+    .tc-net::after {
+      right: 0;
+    }
+
+    .tc-singles-left,
+    .tc-singles-right {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .tc-singles-left {
+      left: 18%;
+    }
+
+    .tc-singles-right {
+      right: 18%;
+    }
+
+    .tc-service-top,
+    .tc-service-bottom {
+      position: absolute;
+      left: 18%;
+      right: 18%;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .tc-service-top {
+      top: 25%;
+    }
+
+    .tc-service-bottom {
+      bottom: 25%;
+    }
+
+    .tc-center-service {
+      position: absolute;
+      left: 50%;
+      top: 25%;
+      bottom: 25%;
+      width: 2px;
+      background: rgba(255, 255, 255, 0.9);
+      transform: translateX(-50%);
+    }
+
+    .tc-center-mark-top,
+    .tc-center-mark-bottom {
+      position: absolute;
+      left: 50%;
+      width: 2px;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.9);
+      transform: translateX(-50%);
+    }
+
+    .tc-center-mark-top {
+      top: 0;
+    }
+
+    .tc-center-mark-bottom {
+      bottom: 0;
+    }
+
+
+    .gh {
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(180deg, rgba(0, 0, 0, .06) 0, rgba(0, 0, 0, .06) 18px, transparent 18px, transparent 36px);
+      z-index: 1
+    }
+
+    @keyframes ym {
+      from {
+        transform: translateX(0)
+      }
+
+      to {
+        transform: translateX(-100px)
+      }
+    }
+
+    .yl {
+      position: absolute;
+      inset: 0;
+      width: 300%;
+      left: -100px;
+      background-image: repeating-linear-gradient(90deg, transparent 0, transparent 96px, rgba(255, 255, 255, .14) 96px, rgba(255, 255, 255, .14) 98px, transparent 98px, transparent 100px);
+      animation: ym 1.8s linear infinite;
+      z-index: 2
+    }
+
+    @keyframes gm {
+      from {
+        transform: translateX(0)
+      }
+
+      to {
+        transform: translateX(-60px)
+      }
+    }
+
+    .gm {
+      position: absolute;
+      inset: 0;
+      width: 200%;
+      background-image: repeating-linear-gradient(90deg, rgba(0, 0, 0, .05) 0, rgba(0, 0, 0, .05) 30px, rgba(255, 255, 255, .025) 30px, rgba(255, 255, 255, .025) 60px);
+      animation: gm .8s linear infinite;
+      z-index: 2
+    }
+
+    .flines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3
+    }
+
+    .flines::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      background: rgba(255, 255, 255, .22);
+      display: none; /* Quitamos la linea blanca gruesa */
+    }
+
+    .flines::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px;
+      height: 80px;
+      border: 2px solid rgba(255, 255, 255, .18);
+      border-radius: 50%
+    }
+
+    .flines-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 5px;
+      height: 5px;
+      background: rgba(255, 255, 255, .25);
+      border-radius: 50%;
+      z-index: 3;
+    }
+
+    .al,
+    .ar,
+    .gl-f,
+    .gr-f {
+      position: absolute;
+      z-index: 3
+    }
+
+    .al {
+      top: 20%;
+      bottom: 20%;
+      left: 0;
+      width: 18%;
+      border: 1.5px solid rgba(255, 255, 255, .2);
+      border-left: none
+    }
+
+    .ar {
+      top: 20%;
+      bottom: 20%;
+      right: 0;
+      width: 18%;
+      border: 1.5px solid rgba(255, 255, 255, .2);
+      border-right: none
+    }
+
+    .gl-f {
+      top: 35%;
+      bottom: 35%;
+      left: 0;
+      width: 4%;
+      border: 2px solid rgba(255, 255, 255, .3);
+      border-left: none
+    }
+
+    .gr-f {
+      top: 35%;
+      bottom: 35%;
+      right: 0;
+      width: 4%;
+      border: 2px solid rgba(255, 255, 255, .3);
+      border-right: none
+    }
+
+    .pov {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(6, 20, 46, .5) 0%, rgba(6, 20, 46, 0) 30%, rgba(6, 20, 46, 0) 70%, rgba(6, 20, 46, .45) 100%);
+      z-index: 4
+    }
+
+    .gov {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 8px 0;
+      pointer-events: none
+    }
+
+    .gl-row {
+      display: flex;
+      align-items: center;
+      padding: 0 7px
+    }
+
+    .gl-row span {
+      font-size: 8px;
+      color: rgba(255, 255, 255, .25);
+      width: 22px
+    }
+
+    .gl-row .line {
+      flex: 1;
+      border-top: 1px solid rgba(255, 255, 255, .07)
+    }
+
+    .gl-row.main .line {
+      border-top-color: rgba(255, 255, 255, .2)
+    }
+
+    .gl-row.main span {
+      color: rgba(255, 255, 255, .45);
+      font-weight: 700
+    }
+
+    #idx {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: clamp(2.2rem, 7vw, 3.5rem);
+      font-weight: 900;
+      line-height: 1;
+      z-index: 10;
+      pointer-events: none;
+      text-shadow: 0 0 30px currentColor
+    }
+
+    #lcred {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      z-index: 10;
+      text-align: right;
+      background: rgba(0, 0, 0, .45);
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 10px;
+      padding: 4px 10px;
+      backdrop-filter: blur(6px)
+    }
+
+    #lcred .lbl {
+      font-size: 7px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: rgba(255, 212, 0, .75);
+      letter-spacing: .1em
+    }
+
+    #lcred .vv {
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1
+    }
+
+    #lcred .cr {
+      font-size: 8px;
+      color: rgba(255, 255, 255, .4);
+      font-weight: 700
+    }
+
+    #evt-flash {
+      position: absolute;
+      left: 50%;
+      bottom: 22%;
+      transform: translateX(-50%) translateY(10px);
+      z-index: 20;
+      background: rgba(0, 0, 0, .75);
+      border: 1px solid rgba(255, 255, 255, .15);
+      border-radius: 999px;
+      padding: 5px 16px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity .3s, transform .3s;
+      pointer-events: none;
+      backdrop-filter: blur(6px)
+    }
+
+
+
+    /* ── PRE-KICK BANNER ── */
+    #prekick {
+      position: absolute;
+      left: 50%;
+      top: 64px;
+      transform: translateX(-50%) translateY(10px);
+      z-index: 21;
+      background: rgba(0, 0, 0, .70);
+      border: 1px solid rgba(255, 255, 255, .15);
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+    }
+
+    #prekick.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #evt-flash.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0)
+    }
+
+    #trail-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 8;
+      pointer-events: none
+    }
+
+    #toast {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: #fff;
+      color: #000;
+      padding: 8px 20px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 11px;
+      text-transform: uppercase;
+      z-index: 50;
+      pointer-events: none;
+      transition: transform .15s;
+      white-space: nowrap
+    }
+
+    #toast.show {
+      transform: translate(-50%, -50%) scale(1)
+    }
+
+    /* ── ACTION BAR ── */
+    #abar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(6, 20, 46, .97);
+      border-top: 1px solid rgba(255, 255, 255, .07);
+      flex-shrink: 0
+    }
+
+    .btn-b {
+      flex: 1;
+      max-width: 150px;
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      border: 1px solid rgba(74, 222, 128, .4);
+      color: #fff;
+      font-weight: 900;
+      font-size: 13px;
+      padding: 9px 0;
+      border-radius: 10px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: .15s;
+      font-family: 'Sora', sans-serif
+    }
+
+    .btn-b:active {
+      transform: scale(.95)
+    }
+
+    .btn-s {
+      flex: 1;
+      max-width: 150px;
+      background: linear-gradient(135deg, #dc2626, #b91c1c);
+      border: 1px solid rgba(248, 113, 113, .4);
+      color: #fff;
+      font-weight: 900;
+      font-size: 13px;
+      padding: 9px 0;
+      border-radius: 10px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: .15s;
+      font-family: 'Sora', sans-serif
+    }
+
+    .btn-s:active {
+      transform: scale(.95)
+    }
+
+    .btn-x {
+      background: linear-gradient(135deg, #92400e, #78350f);
+      border: 1px solid rgba(251, 191, 36, .3);
+      color: rgba(255, 255, 255, .5);
+      font-weight: 900;
+      font-size: 12px;
+      padding: 9px 16px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: .15s;
+      white-space: nowrap;
+      font-family: 'Sora', sans-serif
+    }
+
+    .btn-x.open {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border-color: rgba(251, 191, 36, .6);
+      color: #fff;
+      box-shadow: 0 0 18px rgba(251, 191, 36, .45)
+    }
+
+    .btn-x:active {
+      transform: scale(.95)
+    }
+
+    @media(max-height:420px) and (orientation:landscape) {
+      #topbar {
+        padding: 3px 10px
+      }
+
+      .cbox .val {
+        font-size: 13px
+      }
+
+      #live-score {
+        font-size: 15px
+      }
+
+      #scoreboard {
+        padding: 3px 10px
+      }
+
+      .tblock .nm {
+        font-size: 10px
+      }
+
+      #lcred .vv {
+        font-size: 14px
+      }
+
+      #idx {
+        font-size: clamp(1.6rem, 5vw, 2.2rem)
+      }
+
+      .btn-b,
+      .btn-s {
+        font-size: 10px;
+        padding: 6px 0
+      }
+
+      .btn-x {
+        font-size: 9px;
+        padding: 6px 10px
+      }
+
+      #abar {
+        padding: 4px 8px;
+        gap: 5px
+      }
+    }
+
+    /* ── MODALS ── */
+    .mback {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .75);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px
+    }
+
+    .mback.h {
+      display: none
+    }
+
+    .mcard {
+      background: linear-gradient(145deg, #0c2461, #0b2e6b);
+      border: 1px solid rgba(255, 255, 255, .13);
+      border-radius: 24px;
+      padding: 28px 22px;
+      width: 100%;
+      max-width: 380px;
+      position: relative;
+      max-height: 92vh;
+      overflow-y: auto
+    }
+
+    .mcard h2 {
+      font-size: 20px;
+      font-weight: 900;
+      margin-bottom: 4px
+    }
+
+    .mcard .sub {
+      font-size: 12px;
+      color: rgba(255, 255, 255, .45);
+      margin-bottom: 18px
+    }
+
+    .mi {
+      width: 100%;
+      background: rgba(255, 255, 255, .07);
+      border: 1px solid rgba(255, 255, 255, .13);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      color: #fff;
+      font-family: 'Sora', sans-serif;
+      font-size: 13px;
+      outline: none;
+      transition: .2s
+    }
+
+    .mi:focus {
+      border-color: #FFD400;
+      background: rgba(255, 212, 0, .05)
+    }
+
+    .mcl {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, .35);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1
+    }
+
+    .mcl:hover {
+      color: #fff
+    }
+
+    .mbtn {
+      width: 100%;
+      padding: 13px;
+      font-weight: 900;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Sora', sans-serif;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px
+    }
+
+    .mbtn:active {
+      transform: scale(.97)
+    }
+
+    .mbtn.y {
+      background: #FFD400;
+      color: #000
+    }
+
+    .mbtn.w {
+      background: #fff;
+      color: #000
+    }
+
+    .mbtn.g {
+      background: rgba(255, 255, 255, .08);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, .18)
+    }
+
+    .mbtn.g:hover {
+      background: rgba(255, 255, 255, .14)
+    }
+
+    .sep {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 14px 0;
+      color: rgba(255, 255, 255, .3);
+      font-size: 11px
+    }
+
+    .sep::before,
+    .sep::after {
+      content: '';
+      flex: 1;
+      border-top: 1px solid rgba(255, 255, 255, .1)
+    }
+
+    .err {
+      color: #f87171;
+      font-size: 11px;
+      margin-bottom: 8px;
+      display: none
+    }
+
+    .spin {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(0, 0, 0, .3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin .6s linear infinite
+    }
+
+    .spin.w {
+      border-color: rgba(255, 255, 255, .3);
+      border-top-color: #fff
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    /* Profile */
+    .pstat {
+      display: flex;
+      justify-content: space-around;
+      margin: 14px 0;
+      padding: 14px 8px;
+      background: rgba(255, 255, 255, .05);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, .07)
+    }
+
+    .pstat-item {
+      text-align: center
+    }
+
+    .pstat-item .v {
+      font-size: 18px;
+      font-weight: 900;
+      color: #FFD400
+    }
+
+    .pstat-item .l {
+      font-size: 8px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, .4);
+      letter-spacing: .08em;
+      margin-top: 2px
+    }
+
+    .th-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 11px;
+      background: rgba(255, 255, 255, .04);
+      border-radius: 10px;
+      margin-bottom: 5px;
+      font-size: 11px;
+      border: 1px solid rgba(255, 255, 255, .05)
+    }
+
+    .th-item .pnl {
+      font-weight: 900;
+      font-size: 13px
+    }
+
+    .pos {
+      color: #4ade80
+    }
+
+    .neg {
+      color: #f87171
+    }
+
+    .evt-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 340px;
+      overflow-y: auto
+    }
+
+    .evt-card {
+      background: rgba(255, 255, 255, .05);
+      border-radius: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, .07);
+      cursor: pointer;
+      transition: .15s
+    }
+
+    .evt-card:hover {
+      background: rgba(255, 255, 255, .1);
+      border-color: rgba(255, 212, 0, .3)
+    }
+
+    .evt-card .meta {
+      font-size: 9px;
+      color: rgba(255, 255, 255, .35);
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 3px
+    }
+
+    .evt-card .teams {
+      font-size: 12px;
+      font-weight: 700
+    }
+
+    .evt-card .badge {
+      font-size: 10px;
+      color: #FFD400;
+      font-weight: 900;
+      margin-top: 4px
+    }
+
+    .loading-txt {
+      text-align: center;
+      padding: 24px;
+      color: rgba(255, 255, 255, .4);
+      font-size: 12px
+    }
+
+    /* ── LIVE EVENT FEED (bottom-right) ── */
+    #evt-feed {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 4px;
+      pointer-events: none;
+      max-width: 190px;
+      align-items: flex-end;
+    }
+
+    .feed-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(0, 0, 0, .65);
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      backdrop-filter: blur(6px);
+      animation: feedIn .3s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @keyframes feedIn {
+      from {
+        opacity: 0;
+        transform: translateX(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .feed-item .ft {
+      font-size: 8px;
+      color: rgba(255, 255, 255, .4);
+      margin-left: auto;
+      padding-left: 4px;
+      flex-shrink: 0;
+    }
+
+    .feed-item.goal {
+      border-color: rgba(255, 212, 0, .5);
+      background: rgba(30, 20, 0, .8);
+    }
+
+    .feed-item.card {
+      border-color: rgba(255, 165, 0, .4);
+    }
+
+    .feed-item.red {
+      border-color: rgba(255, 50, 50, .5);
+    }
+
+    /* ── SOUND BUTTON ── */
+    .btn-snd {
+      background: rgba(255, 255, 255, .07);
+      border: 1px solid rgba(255, 255, 255, .15);
+      border-radius: 8px;
+      color: rgba(255, 255, 255, .6);
+      font-size: 14px;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: .15s;
+      flex-shrink: 0;
+    }
+
+    .btn-snd.on {
+      background: rgba(255, 212, 0, .18);
+      border-color: rgba(255, 212, 0, .4);
+      color: #FFD400;
+    }
+
+
+
+    /* ── TENIS: sin panel extra arriba; puntos inline y juegos/sets dentro de la pista ── */
+
+
+    #scoreboard.tennis .live-row,
+    #scoreboard.tennis #live-score,
+    #scoreboard.tennis #match-time {
+      display: none;
+    }
+
+    #scoreboard.tennis .scenter {
+      background: transparent;
+      border: none;
+      padding: 0 6px;
+    }
+
+    #scoreboard.tennis #tennis-inline-points {
+      display: block !important;
+    }
+
+    #tennis-setsbox {
+      position: absolute;
+      top: 10px;
+      left: 42px;
+      z-index: 12;
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.40);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(6px);
+    }
+
+    .tsetcol {
+      width: 26px;
+      overflow: hidden;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    .tsetcol .r1,
+    .tsetcol .r2 {
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .tsetcol .r1 {
+      background: rgba(34, 197, 94, 0.20);
+    }
+
+    .tsetcol .r2 {
+      background: rgba(59, 130, 246, 0.18);
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .tsetcol.current {
+      border-color: rgba(255, 212, 0, 0.40);
+      box-shadow: 0 0 14px rgba(255, 212, 0, 0.18);
+    }
+
+    /* Evita solape de Créditos Live con el marcador dentro de la pista */
+
+    @media(max-height:420px) and (orientation:landscape) {
+      #tennis-setsbox {
+        top: 6px;
+        left: 36px;
+        padding: 4px;
+      }
+
+      .tsetcol {
+        width: 24px;
+      }
+
+      .tsetcol .r1,
+      .tsetcol .r2 {
+        height: 20px;
+        font-size: 13px;
+      }
+    }
+
+
+    /* ── ZOOM VISUAL: contenedor escalable del fondo (no bloquea clicks) ── */
+    #pitch-visual {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      transform-origin: 50% 50%;
+      will-change: transform;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+
+    <!-- TOP BAR -->
+    <div id="topbar">
+      <div style="display:flex;flex-direction:column;line-height:1">
+        <div class="logo">BOLITA<span>.</span></div>
+
+      </div>
+      <div class="sport-tabs">
+        <button class="stab on" onclick="switchSport('football',this)">
+          <span class="dot6" style="background:#4ade80"></span>Fútbol
+        </button>
+        <button class="stab" onclick="switchSport('tennis',this)">
+          <span class="dot6" style="background:#FFD400"></span>Tenis
+        </button>
+      </div>
+      <div class="cbox">
+        <div>
+          <div class="lbl">Créditos</div>
+          <div class="val" id="hbal">1000</div>
+        </div>
+        <button class="btn-snd" id="btn-snd" onclick="toggleSound()" title="Sonido">🔇</button>
+        <button class="btn-snd" id="btn-zoom" onclick="toggleZoom()" title="Zoom">🔎</button>
+        <button class="btn-plus" onclick="showEvents()" title="Partidos">📅</button>
+        <div class="avatar" onclick="handleAvatarClick()">
+          <img id="uavatar" src="https://ui-avatars.com/api/?name=?&background=2563eb&color=fff&size=32" alt="U">
+        </div>
+      </div>
+    </div>
+
+    <!-- SCOREBOARD -->
+    <div id="scoreboard">
+      <div class="tblock">
+        <div class="lbl" id="lbl-home">Visitante</div>
+        <div class="nm" id="team-home">CARGANDO</div>
+      </div>
+      <div class="scenter">
+        <div class="live-row">
+          <div class="ldot"></div><span class="ltxt">EN VIVO</span>
+        </div>
+        <div id="live-score">0-0</div>
+        <div id="match-time">00:00</div>
+        <div id="tennis-inline-points"
+          style="display:none; font-size:18px; font-weight:900; color:#FFD400; font-variant-numeric:tabular-nums; line-height:1;">
+          0-0</div>
+      </div>
+      <div class="tblock r">
+        <div class="lbl" id="lbl-away">Local</div>
+        <div class="nm" id="team-away">CARGANDO</div>
+      </div>
+    </div>
+
+    <!-- PITCH -->
+    <div id="pitch">
+      <!-- Football layers -->
+      <div id="pitch-visual">
+        <div class="gh"></div>
+        <div class="gm"></div>
+        <div class="yl"></div>
+        <div class="flines"></div>
+        <div class="flines-dot"></div>
+        <div class="al"></div>
+        <div class="ar"></div>
+        <div class="gl-f"></div>
+        <div class="gr-f"></div>
+        <div class="pov"></div>
+        <!-- Tennis court overlay -->
+        <div id="tennis-court">
+
+          <div class="tc-play-area">
+            <div class="tc-singles-left"></div>
+            <div class="tc-singles-right"></div>
+            <div class="tc-service-top"></div>
+            <div class="tc-service-bottom"></div>
+            <div class="tc-center-service"></div>
+            <div class="tc-center-mark-top"></div>
+            <div class="tc-center-mark-bottom"></div>
+            <div class="tc-net"></div>
+          </div>
+        </div>
+      </div>
+      <div id="tennis-setsbox" style="display:none;"></div>
+      <div class="gov" id="gov-timeline">
+        <div class="gl-row" data-v="+10"><span>+10</span>
+          <div class="line"></div>
+        </div>
+        <div class="gl-row" data-v="+5"><span>+5</span>
+          <div class="line"></div>
+        </div>
+        <div class="gl-row main" data-v="0"><span>0</span>
+          <div class="line"></div>
+        </div>
+        <div class="gl-row" data-v="-5"><span>-5</span>
+          <div class="line"></div>
+        </div>
+        <div class="gl-row" data-v="-10"><span>-10</span>
+          <div class="line"></div>
+        </div>
+      </div>
+      <div id="lcred">
+        <div class="lbl">Créditos Live</div>
+        <div style="display:flex;align-items:baseline;gap:3px">
+          <span class="vv" id="lcval">1000</span>
+          <span class="cr">CR</span>
+        </div>
+      </div>
+      <div id="idx">+0.0</div>
+      <div id="evt-flash"></div>
+      <div id="prekick"></div>
+      <!-- Live event feed - bottom left -->
+      <div id="evt-feed"></div>
+      <svg id="trail-svg">
+        <defs>
+          <linearGradient id="tg" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#FFD400" stop-opacity="0" />
+            <stop offset="100%" stop-color="#FFD400" stop-opacity="0.9" />
+          </linearGradient>
+          <filter id="bg" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="5" result="b" />
+            <feFlood flood-color="#FFD400" flood-opacity="0.5" result="c" />
+            <feComposite in="c" in2="b" operator="in" result="g" />
+            <feMerge>
+              <feMergeNode in="g" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <path id="trail" fill="none" stroke="url(#tg)" stroke-width="3.2" stroke-linecap="round" />
+        <g id="ball" filter="url(#bg)">
+          <circle r="9" fill="#FFD400" />
+          <circle r="9" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="1" />
+          <circle r="3" cx="0" cy="-3.5" fill="rgba(0,0,0,.28)" />
+          <circle r="2.2" cx="-3.2" cy="2.5" fill="rgba(0,0,0,.22)" />
+          <circle r="2.2" cx="3.2" cy="2.5" fill="rgba(0,0,0,.22)" />
+        </g>
+      </svg>
+
+      <div id="toast"></div>
+    </div>
+
+    <!-- ACTION BAR -->
+    <div id="abar">
+      <button class="btn-b" onclick="openPos('BUY')">▲ COMPRAR</button>
+      <button class="btn-x" id="btn-exit" onclick="closePos()">CASH OUT</button>
+      <button class="btn-s" onclick="openPos('SELL')">▼ VENDER</button>
+    </div>
+
+  </div><!-- /app -->
+
+  <!-- ── MODAL: Auth ── -->
+  <div id="m-auth" class="mback h" style="z-index: 999999;">
+    <div class="mcard">
+      <button class="mcl" onclick="hm('m-auth')">✕</button>
+      <div id="m-auth-c"></div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Profile ── -->
+  <div id="m-profile" class="mback h">
+    <div class="mcard">
+      <button class="mcl" onclick="hm('m-profile')">✕</button>
+      <div id="m-profile-c"></div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Events ── -->
+  <div id="m-events" class="mback h">
+    <div class="mcard">
+      <button class="mcl" onclick="hm('m-events')">✕</button>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:20px">📅</span>
+        <h2 style="margin:0">Próximos Partidos</h2>
+      </div>
+      <div class="sport-tabs" style="margin-bottom:12px;gap:6px">
+        <button class="stab on" id="ev-atab" onclick="loadEvents('all',this)">⭐ Todos</button>
+        <button class="stab" id="ev-ftab" onclick="loadEvents('football',this)">⚽ Fútbol</button>
+        <button class="stab" id="ev-ttab" onclick="loadEvents('tennis',this)">🎾 Tenis</button>
+        <button class="stab" style="border-color:#4ade80; color:#4ade80;" onclick="testAPIDiagnostics()">⚙️ Diagnóstico</button>
+      </div>
+      <div id="ev-list">
+        <p class="loading-txt">Cargando...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ════════════════════════════════════════════════════
+    // ⚙️  CONFIGURACIÓN — Pon aquí tus credenciales
+    // ════════════════════════════════════════════════════
+    const SUPABASE_URL = 'https://barizxfrlzycngtlpkcr.supabase.co';  // ✅ Configurado
+    const SUPABASE_KEY = 'sb_publishable_f7h37G37BTFS4OaDrVpZLg_qtbS2877';  // ✅ Configurado
+    // ════════════════════════════════════════════════════
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ✅ Rehidrata sesión en arranque (móvil/Pages)
+    async function refreshAuthState() {
+      try {
+        const { data, error } = await sb.auth.getSession();
+        if (error) throw error;
+        const sess = data?.session || null;
+        if (sess?.user) {
+          user = sess.user;
+          await loadProfile();
+          updateTopbar();
+          return true;
+        }
+      } catch (e) { }
+      return false;
+    }
+
+
+    // Tras login (SIGNED_IN), fuerza recarga a URL canónica con cache-bust.
+    // Esto evita que el redirect OAuth caiga en /index.html?code=... y Cloudflare sirva otra versión cacheada.
+    function canonicalizeAfterOAuth() {
+      try {
+        const url = new URL(window.location.href);
+        const hasCode = url.searchParams.has('code') || url.searchParams.has('error');
+        const hasHash = (url.hash || '').includes('access_token') || (url.hash || '').includes('code=');
+        if (!(hasCode || hasHash)) return false;
+        const clean = url.origin + url.pathname;
+        window.location.replace(clean + '?v=' + Date.now());
+        return true;
+      } catch (e) { return false; }
+    }
+
+    // ── STATE ──────────────────────────────────────────
+    let user = null;        // Supabase User object
+    let profile = null;     // { id, username, balance, avatar_url }
+    let tradeHistory = [];
+
+    let match = {
+      home: '', away: '', homeScore: 0, awayScore: 0,
+      homeStrength: .5, sport: 'football',
+      matchMins: 0, idEvent: null
+    };
+    let sim = {
+      idx: 0, x: 0, startTime: null, duration: 5400000, pts: [], ballAngle: 0, active: false, targetIdx: 0,
+      v: 0, lastT: 0,
+      testMode: false, testStart: 0, testDuration: 0,
+      tennisTestMode: false, tennisTestStart: 0, tennisTestDuration: 0, tennisProg: 0,
+      freeze: false, freezeIdx: 0,
+      tennis: null
+    };
+    let pos = null;
+    let afId = null;
+    let pollInterval = null;
+    const EVENTS_CACHE = {};
+    const EVENTS_CACHE_TTL_MS = 10 * 60 * 1000;
+    let eventsLoadNonce = 0;
+
+    let selectNonce = 0; // cancela selects async antiguos
+
+
+    // ── SUPABASE AUTH ──────────────────────────────────
+    sb.auth.onAuthStateChange(async (event, session) => {
+      // ✅ Si acabamos de hacer login, recarga a URL canónica (evita versión cacheada con ?code=...)
+      if (event === 'SIGNED_IN' && session?.user) {
+        if (canonicalizeAfterOAuth()) return;
+      }
+
+      if (session?.user) {
+        user = session.user;
+        await loadProfile();
+        updateTopbar();
+        hm('m-auth');
+      } else {
+        user = null; profile = null; pos = null;
+        document.getElementById('btn-exit').classList.remove('open');
+        updateTopbar();
+      }
+    });
+
+    async function loadProfile() {
+      const { data } = await sb.from('profiles').select('*').eq('id', user.id).single();
+      if (data) {
+        profile = data;
+      } else {
+        // fallback if trigger didn't run
+        profile = { id: user.id, username: user.user_metadata?.full_name || user.email.split('@')[0], balance: 1000, avatar_url: user.user_metadata?.avatar_url };
+        await sb.from('profiles').upsert(profile);
+      }
+    }
+
+    async function loadHistory() {
+      const { data } = await sb.from('trades').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(30);
+      tradeHistory = data || [];
+    }
+
+    async function handleAvatarClick() {
+      if (user) { showProfile(); return; }
+      const ok = await refreshAuthState();
+      if (ok) showProfile();
+      else showAuth('login');
+    }
+    // ── GOOGLE LOGIN ───────────────────────────────────
+    async function loginWithGoogle() {
+      // ✅ Mobile-safe: navegación directa (Brave/Android a veces bloquea el flujo si no es redirect)
+      try {
+        const redirectTo = window.location.origin + window.location.pathname;
+        const url = SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(redirectTo) + '&prompt=consent';
+        window.location.href = url;
+      } catch (e) {
+        try { window.location.href = '/'; } catch (_) { }
+      }
+    }
+
+
+    // ── EMAIL AUTH ─────────────────────────────────────
+    async function loginEmail() {
+      const email = document.getElementById('a-email')?.value?.trim();
+      const pass = document.getElementById('a-pass')?.value;
+      if (!email || !pass) { showErr('m-auth', 'Rellena todos los campos'); return; }
+      setLoading('login-btn', true);
+      const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+      setLoading('login-btn', false);
+      if (error) showErr('m-auth', error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : error.message);
+    }
+
+    async function registerEmail() {
+      const uname = document.getElementById('a-uname')?.value?.trim();
+      const email = document.getElementById('a-email')?.value?.trim();
+      const pass = document.getElementById('a-pass')?.value;
+      if (!uname || !email || !pass) { showErr('m-auth', 'Rellena todos los campos'); return; }
+      if (pass.length < 6) { showErr('m-auth', 'Contraseña mínimo 6 caracteres'); return; }
+      setLoading('reg-btn', true);
+      const { error } = await sb.auth.signUp({
+        email, password: pass,
+        options: { data: { full_name: uname } }
+      });
+      setLoading('reg-btn', false);
+      if (error) { showErr('m-auth', error.message); return; }
+      showToast('✅ Revisa tu email para confirmar');
+      hm('m-auth');
+    }
+
+    async function logout() {
+      try {
+        await sb.auth.signOut({ scope: 'local' });
+      } catch (e) {
+        try { console.warn('signOut failed', e); } catch (_) { }
+      } finally {
+        user = null; profile = null; pos = null;
+        try { document.getElementById('btn-exit').classList.remove('open'); } catch (e) { }
+        try { updateTopbar(); } catch (e) { }
+        try { hm('m-profile'); } catch (e) { }
+        try { hm('m-auth'); } catch (e) { }
+        try { showToast('✅ Sesión cerrada'); } catch (e) { }
+      }
+    }
+    // ── AUTH MODAL RENDER ─────────────────────────────
+    function showAuth(mode = 'login') {
+      document.getElementById('m-auth').classList.remove('h');
+      renderAuth(mode);
+    }
+
+    function renderAuth(mode) {
+      const c = document.getElementById('m-auth-c');
+      const googleSVG = `<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.33 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.67 14.62 48 24 48z"/></svg>`;
+
+      if (mode === 'login') {
+        c.innerHTML = `
+      <h2>Bienvenido</h2>
+      <p class="sub">Entra para guardar tus operaciones y competir en el ranking</p>
+      <button class="mbtn g" onclick="loginWithGoogle()">${googleSVG} Continuar con Google</button>
+      <div class="sep">o con email</div>
+      <p class="err" id="m-auth-err"></p>
+      <input class="mi" type="email" id="a-email" placeholder="Email">
+      <input class="mi" type="password" id="a-pass" placeholder="Contraseña">
+      <button class="mbtn w" id="login-btn" onclick="loginEmail()">Entrar</button>
+      <p style="text-align:center;margin-top:12px;font-size:11px;color:rgba(255,255,255,.4)">
+        ¿No tienes cuenta? <span style="color:#FFD400;cursor:pointer;font-weight:700" onclick="renderAuth('register')">Regístrate gratis</span>
+      </p>`;
+      } else {
+        c.innerHTML = `
+      <h2>Únete al Juego</h2>
+      <p class="sub">Crea tu cuenta y recibe 1.000 créditos gratis</p>
+      <button class="mbtn g" onclick="loginWithGoogle()">${googleSVG} Registrarse con Google</button>
+      <div class="sep">o con email</div>
+      <p class="err" id="m-auth-err"></p>
+      <input class="mi" type="text" id="a-uname" placeholder="Nombre de usuario">
+      <input class="mi" type="email" id="a-email" placeholder="Email">
+      <input class="mi" type="password" id="a-pass" placeholder="Contraseña (mín. 6 caracteres)">
+      <button class="mbtn y" id="reg-btn" onclick="registerEmail()">Empezar a operar</button>
+      <p style="text-align:center;margin-top:12px;font-size:11px;color:rgba(255,255,255,.4)">
+        ¿Ya tienes cuenta? <span style="color:#FFD400;cursor:pointer;font-weight:700" onclick="renderAuth('login')">Entrar</span>
+      </p>`;
+      }
+    }
+
+    // ── PROFILE MODAL ──────────────────────────────────
+    async function showProfile() {
+      if (!user) { showAuth('login'); return; }
+      await loadHistory();
+      const c = document.getElementById('m-profile-c');
+      const bal = profile?.balance ?? 1000;
+      const wins = tradeHistory.filter(t => t.pnl >= 0).length;
+      const losses = tradeHistory.filter(t => t.pnl < 0).length;
+      const totalPnL = tradeHistory.reduce((s, t) => s + (t.pnl || 0), 0);
+      const avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.username || '?')}&background=2563eb&color=fff&size=64`;
+
+      let histHTML = tradeHistory.slice(0, 15).map(t => `
+    <div class="th-item">
+      <div>
+        <div style="font-weight:700">${t.side === 'BUY' ? '▲ COMPRA' : '▼ VENTA'}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.4)">${t.match_name || ''}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.3)">${new Date(t.created_at).toLocaleString()}</div>
+      </div>
+      <div class="pnl ${t.pnl >= 0 ? 'pos' : 'neg'}">${t.pnl >= 0 ? '+' : ''}${Math.round(t.pnl)} CR</div>
+    </div>`).join('') || '<p class="loading-txt">Sin operaciones aún</p>';
+
+      c.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <img src="${avatarUrl}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,212,0,.4)">
+      <div>
+        <div style="font-size:18px;font-weight:900">${profile?.username || 'Usuario'}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.4)">${user.email || ''}</div>
+      </div>
+    </div>
+    <div class="pstat">
+      <div class="pstat-item"><div class="v">${Math.floor(bal)}</div><div class="l">Créditos</div></div>
+      <div class="pstat-item"><div class="v" style="color:#4ade80">${wins}</div><div class="l">Ganadas</div></div>
+      <div class="pstat-item"><div class="v" style="color:#f87171">${losses}</div><div class="l">Perdidas</div></div>
+      <div class="pstat-item"><div class="v" style="color:${totalPnL >= 0 ? '#4ade80' : '#f87171'}">${totalPnL >= 0 ? '+' : ''}${Math.round(totalPnL)}</div><div class="l">PnL</div></div>
+    </div>
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.35);letter-spacing:.08em;margin:12px 0 6px">Historial</div>
+    ${histHTML}
+    <button class="mbtn" style="background:rgba(255,50,50,.12);color:#f87171;border:1px solid rgba(255,50,50,.25);margin-top:12px" onclick="logout()">
+      Cerrar Sesión
+    </button>`;
+
+      document.getElementById('m-profile').classList.remove('h');
+    }
+
+    function updateTopbar() {
+      const bal = profile?.balance ?? 1000;
+      document.getElementById('hbal').innerText = Math.floor(bal);
+      const av = profile?.avatar_url || user?.user_metadata?.avatar_url ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.username || '?')}&background=2563eb&color=fff&size=32`;
+      document.getElementById('uavatar').src = av;
+    }
+
+    // ── POSITIONS ─────────────────────────────────────
+    async function openPos(side) {
+      if (pos) { showToast('Cierra tu posición primero'); return; }
+      if (!user) { showAuth('login'); return; }
+
+      // Asegura que el perfil esté cargado (en móvil a veces el auth vuelve antes de que profile llegue)
+      if (!profile) {
+        try { await loadProfile(); } catch (e) { }
+        updateTopbar();
+      }
+
+      const stake = profile?.balance ?? 1000;
+      pos = { side, entryIdx: sim.idx, stake, entryTime: Date.now() };
+      document.getElementById('btn-exit').classList.add('open');
+      showToast(`${side === 'BUY' ? '▲ COMPRADO' : '▼ VENDIDO'} @ ${sim.idx.toFixed(1)}`);
+      updateLiveCredits();
+    }
+
+    async function closePos(auto = false) {
+      if (!pos) { if (!auto) showToast('Sin posición abierta'); return; }
+      const diff = pos.side === 'BUY' ? sim.idx - pos.entryIdx : pos.entryIdx - sim.idx;
+      const pnl = pos.stake * (diff / 100); // Mismo mutiplicador lento que en updateLiveCredits
+      const res = pnl >= 0 ? `✅ +${Math.round(pnl)} CR` : `❌ ${Math.round(pnl)} CR`;
+
+      if (user && profile) {
+        profile.balance += pnl;
+        // Save to Supabase
+        await Promise.all([
+          sb.from('profiles').update({ balance: profile.balance }).eq('id', user.id),
+          sb.from('trades').insert({
+            user_id: user.id, side: pos.side,
+            entry_idx: pos.entryIdx, exit_idx: sim.idx,
+            pnl: Math.round(pnl),
+            match_name: `${match.home} vs ${match.away}`,
+            sport: match.sport
+          })
+        ]);
+        updateTopbar();
+      }
+
+      pos = null;
+      document.getElementById('btn-exit').classList.remove('open');
+      if (!auto) showToast(`CERRADO ${res}`);
+      updateLiveCredits();
+    }
+
+    // ── SIMULATION ─────────────────────────────────────
+    // ── WEB AUDIO ENGINE ───────────────────────────────
+    let audioCtx = null;
+    let soundOn = false;
+
+    function getAudioCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function toggleSound() {
+      soundOn = !soundOn;
+      const btn = document.getElementById('btn-snd');
+      btn.textContent = soundOn ? '🔊' : '🔇';
+      btn.classList.toggle('on', soundOn);
+      if (soundOn) getAudioCtx(); // unlock context on user gesture
+    }
+
+    function playSound(type) {
+      if (!soundOn) return;
+      const ctx = getAudioCtx();
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+
+      if (type === 'goal') {
+        // Crowd roar: burst of noise sweeping up
+        const buf = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.min(1, i / (ctx.sampleRate * .1)) * Math.max(0, 1 - i / (ctx.sampleRate * 1.4));
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const gain = ctx.createGain(); gain.gain.setValueAtTime(0.5, now);
+        const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.5;
+        src.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+        src.start();
+        // Add whistle
+        const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(2200, now); osc.frequency.linearRampToValueAtTime(2600, now + .15);
+        const wg = ctx.createGain(); wg.gain.setValueAtTime(0.2, now); wg.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        osc.connect(wg); wg.connect(ctx.destination); osc.start(); osc.stop(now + 0.5);
+
+      } else if (type === 'whistle') {
+        // Short whistle
+        const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(1800, now); osc.frequency.linearRampToValueAtTime(2000, now + .1);
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.25, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(now + 0.35);
+
+      } else if (type === 'kick') {
+        // Ball kick: short thud
+        const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(120, now); osc.frequency.exponentialRampToValueAtTime(40, now + .08);
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.6, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(now + 0.12);
+
+      } else if (type === 'card') {
+        // Short descending tone
+        const osc = ctx.createOscillator(); osc.type = 'triangle'; osc.frequency.setValueAtTime(600, now); osc.frequency.linearRampToValueAtTime(300, now + .25);
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.18, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.connect(g); g.connect(ctx.destination); osc.start(); osc.stop(now + 0.3);
+      }
+    }
+
+    // ── LIVE EVENT FEED ────────────────────────────────
+    const feedItems = [];
+    const MAX_FEED = 5;
+
+    let _lastFeedPush = 0;
+    const FEED_COOLDOWN_MS = 2400; // evita ráfagas de banners
+    function pushFeed(text, cls, time) {
+      const now = Date.now();
+      // Si llegan varios eventos seguidos, sustituye el más reciente en vez de apilar
+      if (now - _lastFeedPush < FEED_COOLDOWN_MS) {
+        if (feedItems.length) feedItems[0] = { text, cls, time };
+        else feedItems.unshift({ text, cls, time });
+        _lastFeedPush = now;
+        renderFeed();
+        return;
+      }
+      _lastFeedPush = now;
+      feedItems.unshift({ text, cls, time });
+      if (feedItems.length > MAX_FEED) feedItems.pop();
+      renderFeed();
+    }
+
+    function renderFeed() {
+      const feed = document.getElementById('evt-feed');
+      const limit = (match && match.sport === 'tennis') ? 1 : MAX_FEED;
+      const items = feedItems.slice(0, limit);
+      feed.innerHTML = items.map(item =>
+        `<div class="feed-item ${item.cls || ''}"><span>${item.text}</span><span class="ft">${item.time}'</span></div>`
+      ).join('');
+    }
+
+    // ── PN CALCULATION FROM REAL DATA ──────────────────
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+
+
+    // ── FETCH ROBUSTO (timeout + retry) ─────────────────────────────────────
+    async function fetchJSON(url, { timeoutMs = 10000, retries = 2 } = {}) {
+      for (let a = 0; a <= retries; a++) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort('timeout'), timeoutMs);
+        try {
+          const res = await fetch(url, { signal: ctrl.signal });
+          clearTimeout(t);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return await res.json();
+        } catch (e) {
+          clearTimeout(t);
+          if (a >= retries) return null;
+          await new Promise(r => setTimeout(r, 450 + a * 700));
+        }
+      }
+      return null;
+    }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+
+    // ─────────────────────────────────────────────────────────
+    // 🎾 TENIS & ⚽ FUTBOL — Cloudflare Worker API
+    // ─────────────────────────────────────────────────────────
+    // Default to our verified worker URL
+    // 🔍 CONFIGURACIÓN API: Asegúrate de que esta URL es la TUYA de Cloudflare.
+    let PW_API_URL = 'https://bolita.javiarmada.workers.dev/api';
+    
+    // Si tienes el error "Missing env vars", revisa que no estés usando la URL de ejemplo 'javiarmada.workers.dev'. 
+    // Pon la tuya aquí:
+    const overrideApi = localStorage.getItem('PW_API_URL');
+    if (overrideApi) PW_API_URL = overrideApi;
+
+    // Normalizar la URL para evitar errores 404 por slash final o falta de /api
+    if (PW_API_URL.endsWith('/')) PW_API_URL = PW_API_URL.slice(0, -1);
+    if (!PW_API_URL.endsWith('/api')) PW_API_URL += '/api';
+
+    async function PW_fetch_json(endpoint) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort('timeout'), 20000);
+        const url = `${PW_API_URL}${endpoint}`;
+        const res = await fetch(url, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!res.ok) {
+           const text = await res.text().catch(() => "");
+           console.error(`PW_API_HTTP_ERR::${endpoint}::status=${res.status}::${text.slice(0, 100)}`);
+           return null;
+        }
+        return await res.json();
+      } catch (e) {
+        console.warn(`PW_API_ERR::${endpoint}::${e.message}`);
+        return null;
+      }
+    }
+
+
+    // Legacy helper
+    const LS_fetch_json = (path) => PW_fetch_json(path);
+
+
+    function LS_esd_to_ms(esd) {
+      const s = String(esd ?? '');
+      if (s.length < 8) return Date.now();
+      const Y = parseInt(s.slice(0, 4), 10);
+      const M = parseInt(s.slice(4, 6), 10) - 1;
+      const D = parseInt(s.slice(6, 8), 10);
+      const hh = parseInt(s.slice(8, 10) || '0', 10);
+      const mm = parseInt(s.slice(10, 12) || '0', 10);
+      const ss = parseInt(s.slice(12, 14) || '0', 10);
+      return new Date(Y, M, D, hh, mm, ss).getTime();
+    }
+
+    function LS_join_players(arr) {
+      const a = Array.isArray(arr) ? arr : [];
+      return a.map(x => x?.Nm).filter(Boolean).join(' / ') || 'Jugador';
+    }
+
+    function LS_payload(stage, ev) {
+      return {
+        sport: 'tennis',
+        home: LS_join_players(ev?.T1),
+        away: LS_join_players(ev?.T2),
+        eid: String(ev?.Eid || ''),
+        kickoffMs: LS_esd_to_ms(ev?.Esd),
+        comp: `${(stage?.Cnm || 'TENIS')} · ${(stage?.Snm || '')}`.trim(),
+        status: String(ev?.Eps || '')
+      };
+    }
+
+    // ✅ TENIS (LiveScore): solo ATP/WTA Singles (previas OK) — fuera Challenger/ITF/Dobles
+    function LS_tennis_isSingles(ev) {
+      const t1 = Array.isArray(ev?.T1) ? ev.T1 : [];
+      const t2 = Array.isArray(ev?.T2) ? ev.T2 : [];
+      if (t1.length !== 1 || t2.length !== 1) return false;
+      const n1 = String(t1[0]?.Nm ?? '');
+      const n2 = String(t2[0]?.Nm ?? '');
+      const dblRe = /\s\/\s|\s&\s/;
+      if (dblRe.test(n1) || dblRe.test(n2)) return false;
+      return true;
+    }
+    function LS_tennis_isAtpWta(stage) {
+      const txt = (`${stage?.Cnm ?? ''} ${stage?.Snm ?? ''}`).toLowerCase();
+      if (!(txt.includes('atp') || txt.includes('wta'))) return false;
+      if (txt.includes('challenger') || txt.includes('itf')) return false;
+      if (txt.includes('doubles') || txt.includes('double') || txt.includes('mixed')) return false;
+      return true; // qualies/previas OK
+    }
+    function LS_tennis_wanted(stage, ev) {
+      return LS_tennis_isAtpWta(stage) && LS_tennis_isSingles(ev);
+    }
+
+    async function PW_live_events(sport) {
+      if (sport === 'all') {
+         // Cargamos ambos pero permitimos que uno falle sin matar al otro
+         const f = await PW_live_events('football').catch(() => []);
+         const t = await PW_live_events('tennis').catch(() => []);
+         return [...f, ...t];
+      }
+      const ep = sport === 'tennis' ? '/tennis/live' : '/football/live';
+      const data = await PW_fetch_json(ep);
+      if (!data || !data.success) return [];
+
+      return data.events.map(ev => ({
+          sport,
+          eid: ev.eid, 
+          home: ev.home || 'Local',
+          away: ev.away || 'Visita',
+          comp: ev.tournament || 'Torneo',
+          status: ev.status || 'En Vivo',
+          isLive: true,
+          score: ev.score,
+          matchMins: ev.matchMins || 0,
+      }));
+    }
+
+    async function PW_upcoming_events(sport) {
+      if (sport === 'all') {
+         const f = await PW_upcoming_events('football').catch(() => []);
+         const t = await PW_upcoming_events('tennis').catch(() => []);
+         return [...f, ...t];
+      }
+      const ep = sport === 'tennis' ? '/tennis/upcoming' : '/football/upcoming';
+      const data = await PW_fetch_json(ep);
+      if (!data || !data.success || !data.events) return [];
+
+      return data.events.map(ev => ({
+          sport,
+          eid: ev.eid, 
+          home: ev.home || 'Local',
+          away: ev.away || 'Visita',
+          comp: ev.tournament || 'Torneo',
+          status: 'Próximo',
+          isLive: false,
+          kickoffMs: ev.kickoffMs,
+          score: { home: '0', away: '0' }
+      }));
+    }
+
+
+
+    // ─────────────────────────────────────────────────────────
+    // ✅ COMPAT: ymdLocal acepta Date o offset numérico (evita dt.getFullYear is not a function)
+    // ─────────────────────────────────────────────────────────
+    function ymdLocal(dtOrOffset = 0) {
+      const d = (dtOrOffset instanceof Date)
+        ? dtOrOffset
+        : new Date(Date.now() + (Number(dtOrOffset) || 0) * 86400000);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    }
+    // ─────────────────────────────────────────────────────────
+    // 🎯 CONFIG: LIGAS (solo 1ª división) + ODDS API
+    // ─────────────────────────────────────────────────────────
+    // TheSportsDB (free key por defecto: 123)
+    const SPORTSDB_KEY = '123';
+    const SPORTSDB_BASE = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}`;
+
+    // Ligas objetivo (TheSportsDB)
+    const LEAGUE_LALIGA = '4335'; // Spanish La Liga
+    const LEAGUE_EPL = '4328'; // English Premier League
+    // Tenis (TheSportsDB)
+    const LEAGUE_ATP = '4464'; // ATP World Tour
+    const LEAGUE_WTA = '4517'; // WTA Tour
+
+    // ODDS API (The Odds API v4)
+    // ⚠️ Importante: si publicas este HTML, NO dejes tu API key aquí. Usa un proxy/worker.
+    const ODDS_API_KEY = ''; // OFF (evita 401 hasta configurar una key válida)
+    const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
+    // Sport keys (The Odds API)
+    const ODDS_SPORT_EPL = 'soccer_epl';
+    const ODDS_SPORT_LALIGA = 'soccer_spain_la_liga';
+
+    // SofaScore removido en favor del Node+Playwright API
+    function stopTennisLive() { }
+    async function startTennisLiveSofa(home, away, kickoffMs) {
+      showFlash('🎾 Simulación (Sin poller específico por ahora)');
+      return true;
+    }
+
+
+    // Utils listos para su uso.
+
+    // Pre-partido: bola quieta + banner (se quita y arranca X min antes)
+    const SHOW_PREKICK_BANNER = true; // muestra banner de pre-partido
+    const PRE_UNFREEZE_MIN = 5; // empieza a moverse X min antes del inicio
+    const PRE_BANNER_HIDE_MIN = 5; // el banner desaparece X min antes del inicio
+
+    async function fetchNextLeagueEvents(leagueId) {
+      const d = await fetchJSON(`${SPORTSDB_BASE}/eventsnextleague.php?id=${leagueId}`);
+      return d?.events || [];
+    }
+
+
+    function normalizeName(s) {
+      return String(s || '')
+        .toLowerCase()
+        .replace(/\b(fc|cf|sc|ud|cd|ac|afc)\b/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    }
+
+    // ODDS → implied probability (no-vig) → índice base
+    function probDiffToIdx(diff) {
+      // diff en [0..1] aprox. Mapeo suave: solo súper favorito se acerca a 7
+      // diff=0.15→~3 ; diff=0.25→~4.5 ; diff=0.35→~5.5
+      return clamp(7 * Math.tanh(3.0 * diff), 0, 7);
+    }
+    // ODDS → implied probability (no-vig) → índice base (SUAVIZADO)
+    function oddsToIdx(oHome, oDraw, oAway) {
+      const oh = parseFloat(oHome);
+      const od = parseFloat(oDraw);
+      const oa = parseFloat(oAway);
+      if (!isFinite(oh) || oh <= 1 || !isFinite(oa) || oa <= 1) return 0;
+      const pH = 1 / oh;
+      const pD = (isFinite(od) && od > 1) ? 1 / od : 0;
+      const pA = 1 / oa;
+      const s = pH + pD + pA;
+      if (s <= 0) return 0;
+      const nH = pH / s;
+      const nA = pA / s;
+      const diff = (nH - nA);
+      const mag = probDiffToIdx(Math.abs(diff));
+      const idx0 = (diff >= 0 ? mag : -mag);
+      return clamp(idx0, -7, 7);
+    }
+
+    async function fetchOddsForMatch({ home, away, leagueId }) {
+      if (!ODDS_API_KEY || ODDS_API_KEY === 'PEGAR_TU_API_KEY_AQUI') return null;
+      const sportKey = (String(leagueId) === LEAGUE_EPL) ? ODDS_SPORT_EPL : (String(leagueId) === LEAGUE_LALIGA ? ODDS_SPORT_LALIGA : null);
+      if (!sportKey) return null;
+
+      // The Odds API: /v4/sports/{sport_key}/odds?regions=uk&markets=h2h&oddsFormat=decimal&apiKey=...
+      const url = `${ODDS_API_BASE}/sports/${sportKey}/odds?regions=uk&markets=h2h&oddsFormat=decimal&apiKey=${encodeURIComponent(ODDS_API_KEY)}`;
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const games = await r.json();
+
+      const H = normalizeName(home);
+      const A = normalizeName(away);
+
+      const g = (games || []).find(x => {
+        const h = normalizeName(x.home_team);
+        const a = normalizeName(x.away_team);
+        return (h === H && a === A) || (h === A && a === H);
+      });
+      if (!g) return null;
+
+      const bm = (g.bookmakers || [])[0];
+      if (!bm) return null;
+      const market = (bm.markets || []).find(m => m.key === 'h2h');
+      if (!market) return null;
+
+      const out = market.outcomes || [];
+      let oh = null, od = null, oa = null;
+      for (const o of out) {
+        const nm = normalizeName(o.name);
+        if (nm === 'draw') od = o.price;
+        else if (nm === H) oh = o.price;
+        else if (nm === A) oa = o.price;
+      }
+      if (oh == null || oa == null) return null;
+      return { oh, od, oa, commence_time: g.commence_time };
+    }
+
+    function computeKickoffMs(data) {
+      if (data && data.commence_time) {
+        const t = Date.parse(String(data.commence_time));
+        if (isFinite(t)) return t;
+      }
+      const d = data?.dateEvent;
+      const tm = (data?.strTime || '00:00:00').slice(0, 8);
+      if (!d) return null;
+      const t2 = Date.parse(`${d}T${tm}Z`);
+      return isFinite(t2) ? t2 : null;
+    }
+
+    function preKickUIUpdate() {
+      const el = document.getElementById('prekick');
+      if (!el) return;
+      if (typeof SHOW_PREKICK_BANNER !== 'undefined' && !SHOW_PREKICK_BANNER) { el.classList.remove('show'); return; }
+      if (!match || !match.kickoffMs) { el.classList.remove('show'); return; }
+
+      const now = Date.now();
+      const msTo = match.kickoffMs - now;
+      if (msTo <= 0) { el.classList.remove('show'); return; }
+
+      const hideAt = PRE_BANNER_HIDE_MIN * 60000;
+      if (msTo <= hideAt) { el.classList.remove('show'); return; }
+
+      const m = Math.ceil(msTo / 60000);
+      el.textContent = `⏳ No ha comenzado · empieza en ${m} min`;
+      el.classList.add('show');
+    }
+
+
+    // ── FAVORITO (sin cuotas) + MAPEO IZQ/DER ──────────────────
+    // En este proyecto NO hay API de cuotas: solo TheSportsDB (marcador/tiempo).
+    // Para estimar el favorito automáticamente usamos 'forma' (últimos partidos) con eventslast.php.
+
+    // Display state: qué equipo se muestra a la derecha/izquierda
+    match.display = match.display || { leftKey: 'away', rightKey: 'home', favKey: 'none', eps: 0.02 };
+
+    function setSides(rightKey) {
+      match.display.rightKey = rightKey;
+      match.display.leftKey = (rightKey === 'home') ? 'away' : 'home';
+    }
+
+    function keyName(k) { return (k === 'home') ? (match.home || '?') : (match.away || '?'); }
+    function keyScore(k, homeScore, awayScore) { return (k === 'home') ? homeScore : awayScore; }
+    function keyStrength(k) {
+      const hs = (typeof match.homeStrength === 'number') ? match.homeStrength : 0.5;
+      return (k === 'home') ? hs : (1 - hs);
+    }
+
+    function renderLabels() {
+      if (match.sport === 'football') {
+        document.getElementById('lbl-home').innerText = (match.display.leftKey === 'home') ? 'Local' : 'Visitante';
+        document.getElementById('lbl-away').innerText = (match.display.rightKey === 'home') ? 'Local' : 'Visitante';
+      } else {
+        document.getElementById('lbl-home').innerText = 'Jugador 1';
+        document.getElementById('lbl-away').innerText = 'Jugador 2';
+      }
+    }
+
+    function renderScoreboard(homeScore = match.homeScore || 0, awayScore = match.awayScore || 0) {
+      // En tenis el marcador del centro se usa para sets/juegos, así que aquí solo tocamos nombres.
+      const fav = match.display.favKey;
+      const lK = match.display.leftKey;
+      const rK = match.display.rightKey;
+      const leftNm = (fav === lK ? '★ ' : '') + keyName(lK);
+      const rightNm = (fav === rK ? '★ ' : '') + keyName(rK);
+      document.getElementById('team-home').innerText = leftNm;
+      document.getElementById('team-away').innerText = rightNm;
+      if (match.sport === 'football') {
+        const ls = keyScore(lK, homeScore, awayScore);
+        const rs = keyScore(rK, homeScore, awayScore);
+        document.getElementById('live-score').innerText = `${ls}-${rs}`;
+      }
+    }
+
+    function decideFavKey(pHome, eps = (match.display?.eps ?? 0.02)) {
+      const d = pHome - 0.5;
+      if (Math.abs(d) < eps) return 'none';
+      return d > 0 ? 'home' : 'away';
+    }
+
+    async function fetchLastEvents(teamId) {
+      // TheSportsDB: /eventslast.php?id=TEAM_ID
+      const r = await fetch(`${SPORTSDB_BASE}/eventslast.php?id=${teamId}`);
+      const d = await r.json();
+      return d.results || d.events || [];
+    }
+
+    function formScore(teamId, events) {
+      // Calcula puntos (W=3,D=1,L=0) + un pequeño ajuste por goal-diff
+      let pts = 0, gd = 0, n = 0;
+      for (const e of (events || [])) {
+        const hs = parseInt(e.intHomeScore);
+        const as = parseInt(e.intAwayScore);
+        if (!Number.isFinite(hs) || !Number.isFinite(as)) continue;
+        const isHome = String(e.idHomeTeam) === String(teamId);
+        const gf = isHome ? hs : as;
+        const ga = isHome ? as : hs;
+        gd += (gf - ga);
+        if (gf > ga) pts += 3;
+        else if (gf === ga) pts += 1;
+        n++;
+        if (n >= 5) break;
+      }
+      return pts + 0.12 * gd;
+    }
+
+    function logistic(x) { return 1 / (1 + Math.exp(-x)); }
+
+    async function estimateHomeStrengthFromForm(homeTeamId, awayTeamId) {
+      // Devuelve probabilidad aproximada de que el HOME sea más fuerte (0..1)
+      const [hEv, aEv] = await Promise.all([
+        fetchLastEvents(homeTeamId),
+        fetchLastEvents(awayTeamId)
+      ]);
+      const h = formScore(homeTeamId, hEv);
+      const a = formScore(awayTeamId, aEv);
+      const diff = h - a;
+      // Escala: diff ~ [-15..+15] -> logistic suave
+      const pHome = logistic(diff / 3.5);
+      return clamp(pHome, 0.05, 0.95);
+    }
+
+    // ── PN (Dominance Index) relativo al equipo de la DERECHA ─────────────
+    function calcPN(homeScore, awayScore, progressFrac) {
+      const leftKey = match.display?.leftKey || 'away';
+      const rightKey = match.display?.rightKey || 'home';
+      const leftStrength = keyStrength(leftKey);
+      const bias = (leftStrength - 0.5) * 6; // -3..+3 relative to LEFT team
+      const timeFactor = 1 + progressFrac * 0.8;
+
+      const ls = keyScore(leftKey, homeScore, awayScore);
+      const rs = keyScore(rightKey, homeScore, awayScore);
+
+      // Positive = Left team winning/dominating
+      const scorePN = (ls - rs) * 2.2 * timeFactor;
+      return clamp(bias + scorePN, -6.0, 6.0);
+    }
+
+    let _lastTennisPN = 0;
+    function calcTennisPN(hSets, aSets, hGames, aGames, hPts, aPts, tieBreak = false) {
+      const leftKey = match.display?.leftKey || 'away';
+      const rightKey = match.display?.rightKey || 'home';
+      const leftStrength = keyStrength(leftKey);
+      
+      const bias = (leftStrength - 0.5) * 2.0;
+
+      const lSets = keyScore(leftKey, hSets, aSets);
+      const rSets = keyScore(rightKey, hSets, aSets);
+      const lGames = keyScore(leftKey, hGames, aGames);
+      const rGames = keyScore(rightKey, hGames, aGames);
+
+      const setDiff = (lSets - rSets) * 2.5;
+      const gameDiff = (lGames - rGames) * 0.45;
+
+      const lPts = keyScore(leftKey, hPts, aPts);
+      const rPts = keyScore(rightKey, hPts, aPts);
+      const pDiff = (lPts - rPts);
+
+      const pointFactor = tieBreak ? 0.025 : 0.015;
+      const rawTrend = bias + setDiff + gameDiff + clamp(pDiff, -3, 3) * pointFactor;
+      
+      // Smooth interpolation for fluid liquid movement
+      _lastTennisPN = _lastTennisPN * 0.90 + rawTrend * 0.10;
+      return clamp(_lastTennisPN, -10.0, 10.0);
+    }
+
+    // ── ACCELERATED SIMULATION MODE (TEST ENGINE) ──────
+    let simTestTimer = null;
+
+    function startSimTest(sport) {
+      if (pos) { showToast('Cierra tu posición primero'); return; }
+      stopPolling();
+      // Detén simuladores anteriores (evita banners cruzados)
+      if (simTestTimer) { clearInterval(simTestTimer); simTestTimer = null; }
+      if (simTestTimer) clearInterval(simTestTimer);
+
+      match.sport = sport;
+      applyPitchTheme(sport);
+      renderAxisLabels();
+      document.querySelectorAll('#topbar .stab').forEach(b => b.classList.remove('on'));
+
+      if (sport === 'football') {
+        document.getElementById('lbl-home').innerText = 'Visitante';
+        document.getElementById('lbl-away').innerText = 'Local';
+        document.querySelectorAll('#topbar .stab')[0]?.classList.add('on');
+        initMatch({ home: 'Real Madrid', away: 'FC Barcelona', homeStrength: 0.6, sport: 'football' });
+        runFootballSim();
+      } else {
+        document.getElementById('lbl-home').innerText = 'Djokovic';
+        document.getElementById('lbl-away').innerText = 'Nadal';
+        document.querySelectorAll('#topbar .stab')[1]?.classList.add('on');
+        initMatch({ home: 'Nadal', away: 'Djokovic', homeStrength: 0.5, sport: 'tennis' });
+        runTennisSim();
+      }
+
+      const nm = document.getElementById('no-match'); if (nm) nm.style.display = 'none';
+      afId = requestAnimationFrame(frame);
+      hm('m-events');
+      showFlash('🔬 Iniciando Test...');
+    }
+
+    function runFootballSim() {
+      // Test virtual fútbol: tiempo continuo (evita escalones)
+      match.matchMins = 0;
+      sim.testMode = true;
+      sim.testStart = performance.now();
+      sim.testDuration = 36000; // 36s = 90min acelerados
+      sim.freeze = false;
+
+      if (simTestTimer) clearInterval(simTestTimer);
+      simTestTimer = setInterval(() => {
+        // Eventos aleatorios
+        const rnd = Math.random();
+        if (rnd < 0.08) {
+          const isHome = Math.random() < match.homeStrength;
+          const eventType = Math.random();
+
+          if (eventType < 0.4) {
+            // Gol
+            if (isHome) { match.homeScore++; playSound('goal'); pushFeed(`⚽ GOL ${(isHome ? match.home : match.away) || ''}`.trim(), 'goal', Math.floor(match.matchMins)); }
+            else { match.awayScore++; playSound('goal'); pushFeed(`⚽ GOL ${(isHome ? match.home : match.away) || ''}`.trim(), 'goal', Math.floor(match.matchMins)); }
+            renderScoreboard(match.homeScore, match.awayScore);
+            sim.v += (isHome ? +1.0 : -1.0);
+          } else if (eventType < 0.6) {
+            // Córner
+            if (isHome) { playSound('kick'); pushFeed(`🚩 Córner ${(isHome ? match.home : match.away) || ''}`.trim(), '', Math.floor(match.matchMins)); match.homeStrength += 0.05; }
+            else { playSound('kick'); pushFeed(`🚩 Córner ${(isHome ? match.home : match.away) || ''}`.trim(), '', Math.floor(match.matchMins)); match.homeStrength -= 0.05; }
+            sim.v += (isHome ? +0.45 : -0.45);
+          } else if (eventType < 0.8) {
+            // Tarjeta
+            if (isHome) { playSound('card'); pushFeed(`🟨 Amarilla ${(isHome ? match.home : match.away) || ''}`.trim(), 'card', Math.floor(match.matchMins)); match.homeStrength -= 0.02; }
+            else { playSound('card'); pushFeed(`🟨 Amarilla ${(isHome ? match.home : match.away) || ''}`.trim(), 'card', Math.floor(match.matchMins)); match.homeStrength += 0.02; }
+            sim.v += (isHome ? -0.30 : +0.30);
+          } else {
+            // Penalti / peligro
+            if (isHome) { playSound('whistle'); pushFeed(`⚠️ Peligro ${(isHome ? match.home : match.away) || ''}`.trim(), 'red', Math.floor(match.matchMins)); match.homeStrength += 0.15; }
+            else { playSound('whistle'); pushFeed(`⚠️ Peligro ${(isHome ? match.home : match.away) || ''}`.trim(), 'red', Math.floor(match.matchMins)); match.homeStrength -= 0.15; }
+            sim.v += (isHome ? +0.75 : -0.75);
+          }
+        }
+
+        match.homeStrength = clamp(match.homeStrength, 0.2, 0.8);
+        const progressFrac = clamp((performance.now() - sim.testStart) / sim.testDuration, 0, 1);
+        sim.targetIdx = calcPN(match.homeScore, match.awayScore, progressFrac);
+
+        // Fin
+        if ((performance.now() - sim.testStart) >= sim.testDuration) {
+          clearInterval(simTestTimer);
+          showFlash('⏱️ Test Terminado');
+
+          // Congelar final: si hay Madrid, Madrid es positivo; si no, usa rightKey
+          let posKey = null;
+          const hn = (match.home || '').toLowerCase();
+          const an = (match.away || '').toLowerCase();
+          if (hn.includes('madrid')) posKey = 'home';
+          else if (an.includes('madrid')) posKey = 'away';
+          else posKey = (match.display?.rightKey || 'home');
+
+          const ps = keyScore(posKey, match.homeScore, match.awayScore);
+          const os = (posKey === 'home') ? match.awayScore : match.homeScore;
+          const diff = ps - os;
+          const finalIdx = diff === 0 ? 0 : (diff > 0 ? 10 : -10);
+
+          sim.freezeIdx = finalIdx;
+          sim.idx = finalIdx;
+          sim.targetIdx = finalIdx;
+          sim.v = 0;
+          sim.freeze = true;
+          sim.testMode = false;
+
+          if (pos) closePos(true);
+        }
+      }, 800);
+    }
+
+    function runTennisSim() {
+      // Simulación tenis con marcador real (0/15/30/40, Iguales, Ventaja) + tablero tipo TV
+      match.matchMins = 0;
+      match.homeScore = 0; match.awayScore = 0; // sets
+
+      sim.tennisTestMode = true;
+      sim.tennisTestStart = performance.now();
+      sim.tennisTestDuration = 52000; // solo para X si no hay prog calculado
+      sim.tennisProg = 0;
+      sim.freeze = false;
+
+      const t = sim.tennis = {
+        set: 1,
+        hSets: 0, aSets: 0,
+        hGames: 0, aGames: 0,
+        hPts: 0, aPts: 0,
+        tieBreak: false, hTB: 0, aTB: 0,
+        setGamesHistory: [],
+        setScores: [],
+        lastFeed: 0
+      };
+
+      const p1 = match.home || 'Jugador 1';
+      const p2 = match.away || 'Jugador 2';
+      const elInlinePts = document.getElementById('tennis-inline-points');
+      const elSetsBox = document.getElementById('tennis-setsbox');
+      function ptsLabel(h, a) {
+        const map = ['0', '15', '30', '40'];
+        if (t.tieBreak) return `TB ${t.hTB}-${t.aTB}`;
+        if (h >= 3 && a >= 3) {
+          if (h === a) return 'IGUALES';
+          if (h === a + 1) return `VENTAJA ${p1}`;
+          if (a === h + 1) return `VENTAJA ${p2}`;
+        }
+        return `${map[Math.min(h, 3)]}-${map[Math.min(a, 3)]}`;
+      }
+
+
+      function updateTennisBoard() {
+        const lK = match.display?.leftKey || 'away';
+        const rK = match.display?.rightKey || 'home';
+        const byKey = (k, h, a) => (k === 'home') ? h : a;
+
+        const lGames = byKey(lK, t.hGames, t.aGames), rGames = byKey(rK, t.hGames, t.aGames);
+        const lPts = byKey(lK, t.hPts, t.aPts), rPts = byKey(rK, t.hPts, t.aPts);
+        const lTB = byKey(lK, t.hTB, t.aTB), rTB = byKey(rK, t.hTB, t.aTB);
+
+        if (elInlinePts) elInlinePts.style.display = 'block';
+        if (elInlinePts) elInlinePts.innerText = ptsLabel(lPts, rPts, lTB, rTB);
+
+        if (elSetsBox) {
+          elSetsBox.style.display = 'flex';
+          const cols = [];
+          if (t.setScores && t.setScores.length) {
+            for (const sc of t.setScores) {
+              const top = byKey(lK, sc.h, sc.a);
+              const bot = byKey(rK, sc.h, sc.a);
+              cols.push(`<div class="tsetcol"><div class="r1">${top}</div><div class="r2">${bot}</div></div>`);
+            }
+          }
+          cols.push(`<div class="tsetcol current"><div class="r1">${lGames}</div><div class="r2">${rGames}</div></div>`);
+          elSetsBox.innerHTML = cols.join('');
+        }
+      }
+      function updateTennisProgress() {
+        // Progreso por juegos (evita que la bola llegue al final demasiado pronto)
+        const hist = t.setGamesHistory.reduce((a, b) => a + b, 0);
+        const curGames = t.hGames + t.aGames;
+        let partial = 0;
+        if (t.tieBreak) partial = clamp((t.hTB + t.aTB) / 14, 0, 1);
+        else partial = clamp((t.hPts + t.aPts) / 8, 0, 1);
+
+        const gamesPlayed = hist + curGames + partial;
+        const setsToWin = 2;
+        const remSets = Math.max(0, setsToWin - Math.max(t.hSets, t.aSets));
+        const minRemainingGames = remSets * 6;
+        const baseTotal = 24; // estimación inicial
+        const expectedTotal = Math.max(baseTotal, gamesPlayed + minRemainingGames);
+        sim.tennisProg = clamp(gamesPlayed / Math.max(1, expectedTotal), 0, 0.995);
+      }
+
+      function maybeFeed(kind, winnerIsHome) {
+        // En tenis: banners MUY selectivos y coherentes. Solo: ACE, Doble falta y Winner (muy raro)
+        const now = performance.now();
+        if (now - t.lastFeed < 5200) return; // mínimo ~5.2s entre banners
+
+        const who = winnerIsHome ? p1 : p2;
+        let msg = '';
+        if (kind === 'ace') msg = `🎯 ACE ${who}`;
+        else if (kind === 'df') msg = `🤦 Doble falta ${who}`;
+        else if (kind === 'winner') msg = `⚡ Winner ${who}`;
+        else return;
+
+        const p = (kind === 'winner') ? 0.18 : 0.45;
+        if (Math.random() > p) return;
+
+        pushFeed(msg, '', Math.floor(match.matchMins));
+        t.lastFeed = now;
+      }
+
+      function endMatchFreeze() {
+        // Congela y lleva X al final
+        sim.tennisProg = 1;
+        const rightKey = match.display?.rightKey || 'home';
+        const rs = keyScore(rightKey, t.hSets, t.aSets);
+        const ls = (rightKey === 'home') ? t.aSets : t.hSets;
+        const diff = rs - ls;
+        const finalIdx = diff === 0 ? 0 : (diff > 0 ? 10 : -10);
+        sim.freezeIdx = finalIdx;
+        sim.idx = finalIdx;
+        sim.targetIdx = finalIdx;
+        sim.v = 0;
+        sim.freeze = true;
+        sim.tennisTestMode = false;
+        showFlash('⏱️ Test Tenis Terminado');
+      }
+
+
+      function winSet(homeWon) {
+        // Guarda resultado del set terminado (ej: 6/4 o 7/6 si tie-break)
+        let hFinal = t.hGames, aFinal = t.aGames;
+        if (t.tieBreak) {
+          if (homeWon) { hFinal = 7; aFinal = 6; }
+          else { hFinal = 6; aFinal = 7; }
+        }
+        t.setScores.push({ h: hFinal, a: aFinal });
+        if (homeWon) t.hSets++; else t.aSets++;
+        // (tenis) sin banner de set: prioridad al resultado
+        t.setGamesHistory.push(t.hGames + t.aGames + (t.tieBreak ? 1 : 0));
+        t.set++;
+        t.hGames = 0; t.aGames = 0;
+        t.hPts = 0; t.aPts = 0;
+        t.tieBreak = false; t.hTB = 0; t.aTB = 0;
+      }
+
+      function winGame(homeWon) {
+        if (homeWon) t.hGames++; else t.aGames++;
+        t.hPts = 0; t.aPts = 0;
+
+        // Tie-break si 6-6
+        if (t.hGames === 6 && t.aGames === 6) {
+          t.tieBreak = true; t.hTB = 0; t.aTB = 0;
+        }
+
+        // Set ganado (sin tie-break)
+        if (!t.tieBreak) {
+          const gDiff = t.hGames - t.aGames;
+          if ((t.hGames >= 6 || t.aGames >= 6) && Math.abs(gDiff) >= 2) {
+            winSet(gDiff > 0);
+          }
+        }
+      }
+
+      function point(homeWon) {
+        if (t.tieBreak) {
+          if (homeWon) t.hTB++; else t.aTB++;
+          if ((t.hTB >= 7 || t.aTB >= 7) && Math.abs(t.hTB - t.aTB) >= 2) {
+            winSet(t.hTB > t.aTB);
+          }
+        } else {
+          if (homeWon) t.hPts++; else t.aPts++;
+          if ((t.hPts >= 4 || t.aPts >= 4) && Math.abs(t.hPts - t.aPts) >= 2) {
+            winGame(t.hPts > t.aPts);
+          }
+        }
+      }
+
+      // UI inicial
+      updateTennisProgress();
+      updateTennisBoard();
+
+      if (simTestTimer) clearInterval(simTestTimer);
+      simTestTimer = setInterval(() => {
+        match.matchMins += 1;
+
+        // Partido igualado: base 0.5, ligera inercia por sets
+        const baseP = clamp(match.homeStrength || 0.5, 0.35, 0.65);
+        const setBias = clamp((t.hSets - t.aSets) * 0.03, -0.06, 0.06);
+        const pHome = clamp(baseP + setBias, 0.35, 0.65);
+        const homeWinsPoint = Math.random() < pHome;
+
+        // Evento raro (tenis): solo muy principal
+        const ev = Math.random();
+        if (ev < 0.028) maybeFeed('ace', homeWinsPoint);
+        else if (ev < 0.040) maybeFeed('winner', homeWinsPoint);
+        else if (ev < 0.062) maybeFeed('df', !homeWinsPoint);
+
+        point(homeWinsPoint);
+
+        // Inyectamos kinetic energy al modelo de físicas global como en fútbol
+        sim.v += (homeWinsPoint ? +0.55 : -0.55);
+
+        // Índice según sets/juegos/puntos
+        sim.targetIdx = calcTennisPN(t.hSets, t.aSets, t.hGames, t.aGames, t.hPts, t.aPts, t.tieBreak);
+        updateTennisProgress();
+        updateTennisBoard();
+
+        // Fin (mejor de 3): 2 sets
+        if (t.hSets >= 2 || t.aSets >= 2) {
+          clearInterval(simTestTimer);
+          endMatchFreeze();
+          if (pos) closePos(true);
+        }
+
+      }, 4200); // Ralentizado de 2800 a 4200 para dar espacio a la animación flotante de la bola
+    }
+
+    function updateTennisTimeline(currentSet, hSets, aSets) {
+      const gov = document.getElementById('gov-timeline');
+      if (match.sport !== 'tennis') return;
+
+      let html = '<div style="flex:1"></div><div class="gl-row" style="padding-bottom:8px; display:flex; justify-content:flex-start; padding-left:14px; gap:12px;">';
+      for (let i = 1; i <= currentSet; i++) {
+        html += `<span style="color:#FFD400; font-size:10px; font-weight:900; background:rgba(0,0,0,0.4); padding:4px 10px; border-radius:6px; border:1px solid rgba(255,212,0,0.4);">SET ${i}</span>`;
+      }
+      html += '</div>';
+      gov.innerHTML = html;
+    }
+
+    // ── API POLLING ────────────────────────────────────
+    function startPolling(eventId) {
+      stopPolling();
+      match.idEvent = eventId;
+      pollMatchData();                                  // immediate first poll
+      pollInterval = setInterval(pollMatchData, 30000); // every 30 s
+    }
+
+    function stopPolling() {
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      match.idEvent = null;
+      stopTennisLive();
+      try { stopLsPolling(); } catch (e) { } // limpia el Worker poller también
+    }
+
+    async function pollMatchData() {
+      const updateScoreUI = (ev) => {
+        const newHome = parseInt(String(ev.score?.home ?? '0'), 10) || 0;
+        const newAway = parseInt(String(ev.score?.away ?? '0'), 10) || 0;
+
+        if (newHome !== match.homeScore || newAway !== match.awayScore) {
+          const didH = newHome > match.homeScore;
+          const didA = newAway > match.awayScore;
+          match.homeScore = newHome;
+          match.awayScore = newAway;
+          renderScoreboard(newHome, newAway);
+          if (match.sport === 'football') {
+            if (didH) { pushFeed('⚽ GOL', 'goal', match.matchMins); playSound('goal'); showFlash('⚽ GOL!'); }
+            if (didA) { pushFeed('⚽ GOL RIVAL', 'goal', match.matchMins); playSound('goal'); showFlash('⚽ GOL RIVAL!'); }
+          }
+        }
+
+        // Parse status to get match minute
+        // FlashLive sends: "45'", "67'", "45+2'", "HT", "FT", etc.
+        const statusStr = String(ev.status || '');
+        const minMatch = statusStr.match(/^(\d+)/);
+        if (minMatch) {
+          const parsed = parseInt(minMatch[1]);
+          if (parsed > 0) {
+            match.matchMins = parsed;
+            const el = document.getElementById('match-time');
+            if (el) el.innerText = parsed + "'";
+          }
+        } else if (statusStr === 'HT') {
+          match.matchMins = 45;
+          const el = document.getElementById('match-time');
+          if (el) el.innerText = "HT";
+        }
+
+        // Recalculate ball position from score + minute
+        if (match.sport === 'football') {
+          const maxMins = 96;
+          const prog = clamp((match.matchMins || 0) / maxMins, 0, 1);
+          sim.targetIdx = calcPN(match.homeScore, match.awayScore, prog);
+        } else if (match.sport === 'tennis') {
+          // Priority 1: Sets from setsHome (normalized)
+          if (ev.score?.setsHome && ev.score?.setsAway) {
+            const sh = ev.score.setsHome.map(Number);
+            const sa = ev.score.setsAway.map(Number);
+            match.tennisSets = { home: sh, away: sa };
+            const hSets = sh.filter((v,i) => v > sa[i]).length;
+            const aSets = sa.filter((v,i) => v > sh[i]).length;
+            sim.targetIdx = calcTennisPN(hSets, aSets, 0, 0, 0, 0, false);
+          } else {
+            sim.targetIdx = calcTennisPN(newHome, newAway, 0, 0, 0, 0, false);
+          }
+          // NEW 🎾: Real-time Point PBP from the main event object
+          if (ev.score?.pointH !== undefined && ev.score?.pointA !== undefined) {
+            mapPointLabel(ev.score.pointH, ev.score.pointA);
+          }
+        }
+
+        const statusLower = statusStr.toLowerCase();
+        if (statusLower === 'ft' || statusLower === 'ap' || statusLower.includes('finish')) {
+          stopPolling();
+          showFlash('⏱️ Partido Terminado');
+          finalizeMatchUI();
+        }
+      };
+
+      try {
+        // PRIMARY: Try dedicated event detail endpoint (1xBet has minutes)
+        const eid = match.eid || match.idEvent;
+        if (eid) {
+          const r2 = await fetch(`${PW_API_URL}/event/${match.sport}/${eid}`);
+          if (r2.ok) {
+            const d2 = await r2.json();
+            if (d2.success && d2.event) { 
+              // Only return early if we actually parsed a minute, or if it's tennis (which relies on score, not time)
+              const hasMinute = d2.event.status && String(d2.event.status).match(/^(\d+)/);
+              if (hasMinute || match.sport === 'tennis' || d2.event.status === 'HT') {
+                updateScoreUI(d2.event); 
+                return;
+              }
+            }
+          }
+        }
+
+        // FALLBACK: Search for this match in the live list (FlashLive, no minutes but has score)
+        const liveEp = match.sport === 'tennis' ? '/tennis/live' : '/football/live';
+        const r = await fetch(`${PW_API_URL}${liveEp}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.success && Array.isArray(d.events)) {
+            const found = d.events.find(e => String(e.eid) === String(match.eid || match.idEvent));
+            if (found) { updateScoreUI(found); return; }
+          }
+        }
+      } catch (e) { console.warn('Poll error:', e.message); }
+    }
+
+
+    function finalizeMatchUI() {
+      try { setLiveBadge('FINISHED'); } catch (e) { }
+      try {
+        const lK = match.display?.leftKey || 'away';
+        const ls = keyScore(lK, match.homeScore, match.awayScore);
+        const rs = (lK === 'home') ? match.awayScore : match.homeScore;
+        const diff = (ls - rs);
+        const finalIdx = clamp(10 * Math.tanh(0.6 * diff), -10, 10);
+        sim.freeze = true;
+        sim.freezeIdx = finalIdx;
+        sim.idx = finalIdx;
+        sim.targetIdx = finalIdx;
+        sim.v = 0;
+        match.matchMins = Math.max(match.matchMins || 0, 90);
+      } catch (e) { }
+      if (pos) closePos(true);
+    }
+
+
+    function showFlash(txt) {
+      const fl = document.getElementById('evt-flash');
+      fl.innerText = txt;
+      fl.classList.add('show');
+      setTimeout(() => fl.classList.remove('show'), 2200);
+    }
+
+
+    // ── AUTO PICKERS ───────────────────────────────────
+    async function autoPickDefaultTennis() {
+      try {
+        let events = await PW_live_events('tennis');
+        // Si no hay en vivo, buscamos próximos
+        if (!events || events.length === 0) {
+           events = await PW_upcoming_events('tennis');
+        }
+        if (events && events.length > 0) {
+          selectEvent(events[0]);
+          return true;
+        }
+      } catch (e) { }
+      return false;
+    }
+
+    async function autoPickDefaultFootball() {
+      try {
+        let events = await PW_live_events('football');
+        // Si no hay en vivo, buscamos próximos
+        if (!events || events.length === 0) {
+           events = await PW_upcoming_events('football');
+        }
+        if (events && events.length > 0) {
+          selectEvent(events[0]);
+          return true;
+        }
+      } catch (e) { }
+      return false;
+    }
+
+
+    // ── INIT MATCH ─────────────────────────────────────
+    function initMatch(m = {}) {
+      // Preserva minuto si viene del partido real (intElapsed/matchMins)
+      const minsIn = (m.matchMins != null) ? parseFloat(m.matchMins) : ((m.intElapsed != null) ? parseFloat(m.intElapsed) : 0);
+      const mins0 = Number.isFinite(minsIn) ? minsIn : 0;
+
+      Object.assign(match, m, {
+        homeScore: m.homeScore || 0,
+        awayScore: m.awayScore || 0,
+        matchMins: mins0
+      });
+      // kickoff/idxBase
+      match.kickoffMs = m.kickoffMs || null;
+      match.idxBase = (m.idxBase != null) ? m.idxBase : null;
+      preKickUIUpdate();
+
+
+      // Defaults
+      if (typeof match.homeStrength !== 'number') match.homeStrength = 0.5;
+      if (!match.display) match.display = { leftKey: 'away', rightKey: 'home', favKey: 'none', eps: 0.02 };
+
+      renderLabels();
+      renderScoreboard(match.homeScore, match.awayScore);
+
+      // Reset físico
+      sim.v = 0;
+      sim.lastT = 0;
+      sim.freeze = false;
+      sim.freezeIdx = 0;
+
+      // ✅ FIX: si no tenemos matchMins pero sí kickoffMs en el pasado, estimamos el minuto
+      let effectiveMins = match.matchMins || 0;
+      if (effectiveMins <= 0 && match.kickoffMs) {
+        const msSinceKick = Date.now() - match.kickoffMs;
+        if (msSinceKick > 0 && msSinceKick < 130 * 60 * 1000) {
+          const rawMins = Math.floor(msSinceKick / 60000);
+          // Si ya pasó >60 min de reloj, descontamos los ~15 del descanso
+          effectiveMins = (rawMins > 60) ? Math.min(rawMins - 15, 90) : Math.min(rawMins, 45);
+          match.matchMins = effectiveMins;
+        }
+      }
+
+      // Coloca bola según minuto actual (fútbol). En tenis queda al inicio.
+      const prog0 = (match.sport === 'football') ? clamp(effectiveMins / 90, 0, 1) : 0;
+      sim.startTime = Date.now() - prog0 * sim.duration;
+
+
+      const pitch0 = document.getElementById('pitch');
+      if (pitch0) {
+        const W0 = pitch0.clientWidth, H0 = pitch0.clientHeight;
+        sim.x = clamp(prog0 * W0, BALL_R, Math.max(BALL_R, W0 - BALL_R));
+        sim.targetIdx = (match.sport === 'tennis')
+          ? calcTennisPN(match.homeScore, match.awayScore, 0, 0, 0, 0, false)
+          : calcPN(match.homeScore, match.awayScore, prog0);
+
+        if (match.idxBase != null && Number.isFinite(match.idxBase) && match.homeScore === 0 && match.awayScore === 0 && prog0 < 0.05) {
+          // Partido pre-partido: la bola empieza guiada por la probabilidad pre-match probabilística
+          sim.idx = clamp(match.idxBase, -10, 10);
+          sim.targetIdx = sim.idx;
+        } else if (Number.isFinite(sim.targetIdx)) {
+          // Partido empezado (live): la bola arranca EXACTAMENTE donde le toca según los goles/juegos reales
+          sim.idx = sim.targetIdx;
+        } else {
+          // Si no hay targetIdx ni idxBase, la bola arranca en el centro (0)
+          sim.idx = 0;
+        }
+
+        // ✅ FIX: "Estrella fugaz" (Zoom) vs "Línea completa" (Normal)
+        sim.pts = [];      // Estela histórica completa
+        sim.tailPts = [];  // Cola corta de cometa (para zoom)
+
+        const rel0 = sim.idx;
+        const y0 = ((VIEW_RANGE - rel0) / (2 * VIEW_RANGE)) * H0;
+
+        if (prog0 > 0) {
+          const steps = Math.floor(prog0 * 600); // Historia completa
+          let tempIdx = match.idxBase || 0;
+
+          for (let i = 0; i < steps; i++) {
+            const p = i / steps * prog0;
+            const px = clamp(p * W0, BALL_R, Math.max(BALL_R, W0 - BALL_R));
+            const tIdx = calcPN(match.homeScore, match.awayScore, p);
+            tempIdx += (tIdx - tempIdx) * 0.05; // suavizado histórico
+            const py = ((VIEW_RANGE - tempIdx) / (2 * VIEW_RANGE)) * H0;
+
+            sim.pts.push({ x: px, y: py, _worldX: px, _worldY: py });
+
+            // Guardamos los últimos 120 puntos en tailPts
+            if (i >= steps - 120) {
+              sim.tailPts.push({ x: px, y: py, _worldX: px, _worldY: py });
+            }
+          }
+          // Si hubo menos de 120 puntos, copiamos los que haya
+          if (sim.tailPts.length === 0) {
+            sim.tailPts = [...sim.pts];
+          }
+        }
+
+        document.getElementById('ball').setAttribute('transform', `translate(${sim.x},${y0})`);
+        document.getElementById('trail').setAttribute('d', '');
+
+      }
+
+      // Tiempo visible
+      if (match.sport === 'football') {
+        const mm = Math.max(0, Math.floor(match.matchMins));
+        const timeEl = document.getElementById('match-time');
+        if (timeEl) timeEl.innerText = String(mm).padStart(2, '0') + ':00';
+      }
+
+      sim.active = true;
+    }
+
+    // ── ANIMATION FRAME (spring to target, no random) ──
+    function frame(now) {
+      if (!sim.active) return;
+      const pitch = document.getElementById('pitch');
+      const W = pitch.clientWidth, H = pitch.clientHeight;
+
+      // Timing (dt) para animación consistente
+      const nowMs = (typeof now === "number") ? now : performance.now();
+      if (!sim.lastT) sim.lastT = nowMs;
+      const dt = Math.min(0.05, (nowMs - sim.lastT) / 1000);
+      sim.lastT = nowMs;
+
+      // Pre-kick UI + congelación
+      preKickUIUpdate();
+      const preUnfreezeMs = PRE_UNFREEZE_MIN * 60000;
+      const nowAbs = Date.now();
+      const preKick = (match && match.kickoffMs && nowAbs < match.kickoffMs - preUnfreezeMs);
+      if (preKick) {
+        sim.freeze = true;
+        sim.freezeIdx = (match.idxBase != null && Number.isFinite(match.idxBase)) ? clamp(match.idxBase, -10, 10) : 0;
+      } else if (match && match.kickoffMs && nowAbs < match.kickoffMs) {
+        sim.freeze = false;
+      }
+
+
+      // X = match time progress
+      let prog = 0;
+      if (match.sport === 'football') {
+        if (sim.testMode && sim.testStart) {
+          const e = Math.max(0, nowMs - sim.testStart);
+          prog = clamp(e / (sim.testDuration || sim.duration), 0, 1);
+          match.matchMins = prog * 90;
+          const totalSecs = Math.floor(prog * 5400);
+          const mm = Math.floor(totalSecs / 60);
+          const ss = totalSecs % 60;
+          const timeEl = document.getElementById('match-time');
+          if (timeEl) timeEl.innerText = String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+        } else {
+          let mmNum = (match.matchMins != null) ? parseFloat(match.matchMins) : 0;
+          if (mmNum <= 0 && match.kickoffMs && match.homeScore + match.awayScore > 0) {
+            const msSinceKick = Date.now() - match.kickoffMs;
+            const rawMins = msSinceKick / 60000;
+            if (rawMins > 0 && rawMins < 130) {
+              mmNum = (rawMins > 60) ? Math.min(rawMins - 15, 90) : Math.min(rawMins, 45);
+            }
+          }
+
+          // 🕒 FIX: If match is live (isLive) and still no minutes,
+          // count up from when the match was selected (approximate)
+          const isRealLive = match.isLive && match.eid;
+          if (mmNum <= 0 && isRealLive) {
+            if (!sim._liveLoadedAt) sim._liveLoadedAt = Date.now();
+            mmNum = Math.floor((Date.now() - sim._liveLoadedAt) / 60000);
+          }
+
+          // 🕒 FIX: Scale smoothly over 90 mins, dynamic to 120 in extra time
+          const maxMins = (mmNum > 90) ? 120 : 90;
+          prog = mmNum > 0 ? clamp(mmNum / maxMins, 0, 1) : clamp((Date.now() - sim.startTime) / sim.duration, 0, 1);
+          if (match && match.kickoffMs && Date.now() < match.kickoffMs) {
+            prog = 0.0;
+          }
+
+          // Update the clock display
+          const timeEl = document.getElementById('match-time');
+          if (timeEl && mmNum > 0) {
+            timeEl.innerText = Math.floor(mmNum) + "'";
+          }
+        }
+      } else {
+        // tenis: usa progreso por juegos si existe
+        if (sim.tennisTestMode && Number.isFinite(sim.tennisProg) && sim.tennisProg > 0) {
+          prog = clamp(sim.tennisProg, 0, 1);
+        } else {
+          const mmIn = (match.matchMins != null) ? parseFloat(match.matchMins) : 0;
+          const mmNum = Number.isFinite(mmIn) ? mmIn : 0;
+          prog = mmNum > 0 ? clamp(mmNum / 90, 0, 1) : clamp((Date.now() - sim.startTime) / sim.duration, 0, 1);
+        }
+      }
+
+      let targetX = prog * W;
+      const RIGHT_MARGIN = 24;
+      // In zoom: always keep ball horizontally centered. Background camera pans to match field position.
+      if (zoomOn) {
+        targetX = W / 2;
+      }
+      targetX = clamp(targetX, BALL_R, Math.max(BALL_R, W - RIGHT_MARGIN));
+      if (sim.x == null) sim.x = targetX;
+      const xAlpha = 1 - Math.exp(-10 * dt);
+      sim.x += (targetX - sim.x) * xAlpha;
+
+      if (!Number.isFinite(sim.targetIdx)) sim.targetIdx = 0;
+      if (sim.freeze) {
+        sim.idx = clamp(sim.freezeIdx, -10, 10);
+        sim.v = 0;
+      } else {
+        const f = dt * 60;
+        const isZoom = typeof zoomOn !== 'undefined' && zoomOn;
+        // Phase 5: In zoom, use VERY subtle sinusoidal drift — calm, not bouncy
+        let randAcc;
+        if (isZoom) {
+          // Tiny gentle wave: amplitude so small user barely notices unless targetIdx changes
+          const wave = Math.sin(nowMs / 3500) * 0.004 + Math.sin(nowMs / 5200) * 0.002;
+          randAcc = wave * f;
+        } else {
+          randAcc = (Math.random() - 0.5) * 0.12 * f;
+        }
+        const pullAmp = isZoom ? 0.025 : 0.065;
+        const pull = (sim.targetIdx - sim.idx) * pullAmp * f;
+        sim.v += (randAcc + pull);
+        sim.v *= Math.pow(isZoom ? 0.985 : 0.96, f);
+        sim.v = clamp(sim.v, -1.25, 1.25);
+        sim.idx += sim.v;
+        if (Math.abs(sim.idx) > 7) sim.v -= (sim.idx * 0.012) * f;
+        sim.idx = clamp(sim.idx, -10, 10);
+      }
+
+      // Cámara/zoom: actualiza transform del fondo (y los parámetros cam*)
+      applyBackgroundZoom();
+
+      // Coordenadas mundo de la bola (mismo mapeo que SIN zoom)
+      const worldX = sim.x;
+      // Micro-movimiento pre-partido (muy leve, sin saltos): solo mueve la bola, no el índice
+      const preWiggle = (preKick && sim.freeze) ? (Math.sin(nowMs / 420) * 0.08) : 0; // ±0.08 idx
+      const worldY = ((VIEW_RANGE - (sim.idx + preWiggle)) / (2 * VIEW_RANGE)) * H;
+
+      // Proyección a pantalla (bola y background sincronizados)
+      let xScreen = worldX;
+      let yScreen = worldY;
+
+      // En tenis: mantenemos la bola siempre en el centro exacto (X e Y)
+      if (match.sport === 'tennis') {
+        xScreen = W / 2;
+        yScreen = H / 2;
+      } else if (zoomOn) {
+        const cx = W / 2, cy = H / 2;
+        xScreen = cx + camS * (worldX - cx) + camPanX;
+        yScreen = cy + camS * (worldY - cy) + camPanY;
+        zoomCenterUI = camViewCenter; // eje dinámico coincide con lo que estás viendo
+      }
+
+      if (!sim.freeze) {
+        sim.pts = sim.pts || [];
+        sim.tailPts = sim.tailPts || [];
+
+        // Store natural world coordinates for trail (not zoom-overridden)
+        const trailPt = { _worldX: worldX, _worldY: worldY };
+        let lastPt = sim.pts[sim.pts.length - 1];
+        let movedEnough = true;
+        if (lastPt) {
+          const dx = worldX - lastPt._worldX;
+          const dy = worldY - lastPt._worldY;
+          movedEnough = (dx * dx + dy * dy) > 0.25;
+        }
+        if (movedEnough || sim.pts.length === 0) {
+          sim.pts.push(trailPt);
+          sim.tailPts.push({ ...trailPt });
+        }
+      }
+
+      // Con la optimización de distancia, 15000 puntos cubren horas enteras sobradamente.
+      if (sim.pts.length > 15000) sim.pts.shift();
+      if (sim.tailPts.length > 120) sim.tailPts.shift(); // Cola de cometa corta
+
+      if (!preKick) sim.ballAngle = (sim.ballAngle + (zoomOn ? 0.8 : 1.8)) % 360;
+      document.getElementById('ball').setAttribute('transform', `translate(${xScreen},${yScreen}) rotate(${sim.ballAngle})`);
+
+      tickAxis(nowMs);
+
+      // ─── TRAIL RENDERING ───────────────────────────────────────────────
+      if (zoomOn) {
+        // Zoom trail: smooth chart-line wave anchored at ball center (xScreen = W/2)
+        // Records idx every frame, smoothed with EMA to remove serruchos
+        sim._idxHistory = sim._idxHistory || [];
+        sim._idxHistory.push(sim.idx);
+        if (sim._idxHistory.length > 120) sim._idxHistory.shift();
+
+        const hist = sim._idxHistory;
+        if (hist.length > 3) {
+          // EMA smoothing (alpha=0.15 → very smooth, eliminates serruchos)
+          const alpha = 0.15;
+          const smoothed = [];
+          let ema = hist[0];
+          for (const v of hist) {
+            ema = alpha * v + (1 - alpha) * ema;
+            smoothed.push(ema);
+          }
+
+          // Trail: spans ~70% of screen width to the LEFT of center ball
+          const trailEndX = xScreen;   // = W/2 in zoom
+          const trailLen = W * 0.70;
+          const trailStartX = trailEndX - trailLen;
+          const segW = trailLen / (smoothed.length - 1);
+
+          let d = '';
+          for (let i = 0; i < smoothed.length; i++) {
+            // Map idx value to Y on screen using current zoom camera
+            const rawY = ((VIEW_RANGE - smoothed[i]) / (2 * VIEW_RANGE)) * H;
+            const cx2 = W / 2, cy2 = H / 2;
+            const py = cy2 + camS * (rawY - cy2) + camPanY;
+            const px = trailStartX + i * segW;
+            if (i === 0) d += `M ${px.toFixed(1)} ${py.toFixed(1)}`;
+            else d += ` L ${px.toFixed(1)} ${py.toFixed(1)}`;
+          }
+          document.getElementById('trail').setAttribute('d', d);
+          document.getElementById('trail').setAttribute('stroke-width', '3.2');
+        }
+      } else {
+        // Non-zoom: classic full historical trail (no changes)
+        const activePts = sim.pts;
+        if (activePts && activePts.length > 1) {
+          let d = '';
+          for (let i = 0; i < activePts.length; i++) {
+            const pt = activePts[i];
+            const pX = pt._worldX != null ? pt._worldX : pt.x;
+            const pY = pt._worldY != null ? pt._worldY : pt.y;
+            if (i === 0) d += `M ${pX} ${pY}`;
+            else d += ` L ${pX} ${pY}`;
+          }
+          document.getElementById('trail').setAttribute('d', d);
+        }
+      }
+
+      const iv = document.getElementById('idx');
+      iv.innerText = (sim.idx >= 0 ? '+' : '') + sim.idx.toFixed(1);
+      iv.style.color = sim.idx >= 0 ? '#4ade80' : '#f87171';
+      iv.style.textShadow = `0 0 30px ${sim.idx >= 0 ? 'rgba(74,222,128,.7)' : 'rgba(248,113,113,.7)'}`;
+      // Zoom: move idx to top-center as a large bold badge
+      if (zoomOn) {
+        iv.style.position = 'absolute';
+        iv.style.left = '50%';
+        iv.style.transform = 'translateX(-50%)';
+        iv.style.top = '12px';
+        iv.style.bottom = '';
+        iv.style.fontSize = '56px';
+        iv.style.fontWeight = '900';
+        iv.style.textAlign = 'center';
+        iv.style.background = 'rgba(0,0,0,0.55)';
+        iv.style.padding = '2px 22px 6px';
+        iv.style.borderRadius = '28px';
+        iv.style.backdropFilter = 'blur(8px)';
+        iv.style.zIndex = '10';
+        iv.style.letterSpacing = '-2px';
+        iv.style.lineHeight = '1.05';
+      } else {
+        iv.style.position = '';
+        iv.style.left = '';
+        iv.style.transform = '';
+        iv.style.top = '';
+        iv.style.bottom = '';
+        iv.style.fontSize = '';
+        iv.style.fontWeight = '';
+        iv.style.textAlign = '';
+        iv.style.background = '';
+        iv.style.padding = '';
+        iv.style.borderRadius = '';
+        iv.style.backdropFilter = '';
+        iv.style.zIndex = '';
+        iv.style.letterSpacing = '';
+        iv.style.lineHeight = '';
+      }
+      updateLiveCredits();
+
+      afId = requestAnimationFrame(frame);
+    }
+
+    function updateLiveCredits() {
+      // Base = balance real (si existe) o stake de la posición (si está abierta)
+      const base = pos ? (pos.stake ?? (profile?.balance ?? 1000)) : (profile?.balance ?? 1000);
+      let live = base;
+      if (pos) {
+        const diff = pos.side === 'BUY' ? (sim.idx - pos.entryIdx) : (pos.entryIdx - sim.idx);
+        live = base + (base * (diff / 100)); // Movimiento lento y realista
+      }
+      const el = document.getElementById('lcval');
+      if (el) {
+        el.innerText = Math.round(live);
+        el.style.color = (live >= base) ? '#4ade80' : '#f87171';
+      }
+    }
+
+    // ── SPORT SWITCH ───────────────────────────────────
+    function switchSport(sport, btn) {
+      selectNonce++; // invalida selectEvent pendientes
+      document.querySelectorAll('.stab').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      stopPolling();
+      if (simTestTimer) clearInterval(simTestTimer);
+      sim.active = true;
+      if (afId) cancelAnimationFrame(afId);
+      match.sport = sport;
+      applyPitchTheme(sport);
+
+      setNoMatchState(sport);
+      if (sport === 'football') { autoPickDefaultFootball().then(ok => { if (!ok) autoLoadMatch('football'); }); }
+      else { autoPickDefaultTennis().then(ok => { if (!ok) autoLoadMatch('tennis'); }); }
+    }
+
+    // ─── TENNIS POINT-BY-POINT (Native) ────────────────
+    function mapPointLabel(h, a) {
+      if (h == null || a == null) return;
+      const el = document.getElementById('tennis-inline-points');
+      if (!el) return;
+      
+      const hs = String(h).toUpperCase(), as = String(a).toUpperCase();
+      // Literal points (15, 30, 40, A)
+      const isPoints = v => ['15','30','40','A','AD'].includes(v);
+      if (isPoints(hs) || isPoints(as)) {
+        el.innerText = `${hs}-${as}`;
+        return;
+      }
+
+      // Small integers (0, 1, 2, 3) mapped to tennis points
+      const map = ['0','15','30','40'];
+      const H = parseInt(h), A = parseInt(a);
+      if (isNaN(H) || isNaN(A)) {
+        el.innerText = `${hs}-${as}`;
+        return;
+      }
+      
+      if (H >= 3 && A >= 3) {
+        if (H === A) el.innerText = '40-40';
+        else if (H > A) el.innerText = 'A-40';
+        else el.innerText = '40-A';
+      } else {
+        el.innerText = `${map[H] || H}-${map[A] || A}`;
+      }
+    }
+
+    async function startTennisLiveSofa(sofaId) {
+      if (tennisPbpTimer) clearInterval(tennisPbpTimer);
+      const id = String(sofaId).replace('sofa_', '');
+      
+      const poll = async () => {
+        try {
+          // Use nocache to bypass edge caching for live PBP
+          const res = await fetch(`${PW_API_URL}/tennis/pbp/${id}?nocache=1&_=${Date.now()}`);
+          const d = await res.json();
+          if (d.success && d.incidents) {
+            // Incidents are chronological, so we want the LAST one that is a 'point'
+            let latest = null;
+            for (let i = d.incidents.length - 1; i >= 0; i--) {
+              const it = d.incidents[i];
+              if (it.incidentType === 'point' || it.homeScore !== undefined) {
+                latest = it;
+                break;
+              }
+            }
+            if (latest) {
+              const key = `${latest.homeScore}-${latest.awayScore}-${latest.id || ''}`;
+              if (key === tennisPbpLastKey) return;
+              tennisPbpLastKey = key;
+              mapPointLabel(latest.homeScore, latest.awayScore);
+            }
+          }
+        } catch(e) {}
+      };
+      
+      await poll();
+      tennisPbpTimer = setInterval(poll, 2000);
+    }
+
+    function applyPitchTheme(sport) {
+      const tc = document.getElementById('tennis-court');
+      const footballLayers = document.querySelectorAll('.gh,.gm,.yl,.flines,.flines-dot,.al,.ar,.gl-f,.gr-f,.pov');
+      const gov = document.getElementById('gov-timeline');
+      const sbEl = document.getElementById('scoreboard');
+
+      if (sport === 'tennis') {
+        if (sbEl) sbEl.classList.add('tennis');
+        tc.classList.add('active');
+        const sbx = document.getElementById('tennis-setsbox'); if (sbx) sbx.style.display = 'flex';
+        footballLayers.forEach(el => el.style.display = 'none');
+        // Limpia feed al entrar en tenis para no arrastrar banners anteriores
+        feedItems.length = 0; renderFeed();
+        // Tenis: sin etiqueta de SET aquí (para no afear el marcador de juegos)
+        gov.innerHTML = `
+  <div class="gl-row" data-v="+10"><span>+10</span><div class="line"></div></div>
+  <div class="gl-row" data-v="+5"><span>+5</span><div class="line"></div></div>
+  <div class="gl-row main" data-v="0"><span>0</span><div class="line"></div></div>
+  <div class="gl-row" data-v="-5"><span>-5</span><div class="line"></div></div>
+  <div class="gl-row" data-v="-10"><span>-10</span><div class="line"></div></div>
+`;
+      } else {
+        if (sbEl) sbEl.classList.remove('tennis');
+        tc.classList.remove('active');
+        const sbx = document.getElementById('tennis-setsbox'); if (sbx) sbx.style.display = 'none';
+        footballLayers.forEach(el => el.style.display = '');
+
+        // Restore Dominance Index
+        gov.innerHTML = `
+                    <div class="gl-row" data-v="+10"><span>+10</span><div class="line"></div></div>
+                    <div class="gl-row" data-v="+5"><span>+5</span><div class="line"></div></div>
+                    <div class="gl-row main" data-v="0"><span>0</span><div class="line"></div></div>
+                    <div class="gl-row" data-v="-5"><span>-5</span><div class="line"></div></div>
+                    <div class="gl-row" data-v="-10"><span>-10</span><div class="line"></div></div>
+                `;
+      }
+
+      // Re-render del eje (por si cambia deporte con zoom activo)
+      renderAxisLabels();
+      // Al cambiar de deporte, abre/actualiza lista de próximos partidos
+
+
+    }
+
+    // ── EVENTS API ─────────────────────────────────────
+    async function showEvents() {
+      document.getElementById('m-events').classList.remove('h');
+      await loadEvents('all', document.getElementById('ev-atab'));
+    }
+
+    async function loadEvents(sport, btn) {
+      const list = document.getElementById('ev-list');
+      if (!list) return;
+
+      const nonce = ++eventsLoadNonce;
+
+      // Tabs
+      if (btn) {
+        btn.parentElement.querySelectorAll('.estab').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+      }
+
+      list.innerHTML = `<p class="loading-txt">⏳ Buscando partidos...</p>`;
+
+      // Fetch BOTH live and upcoming IN PARALLEL — always
+      let liveEvents = [], upcomingEvents = [];
+      try {
+        [liveEvents, upcomingEvents] = await Promise.all([
+          PW_live_events(sport).catch(() => []),
+          PW_upcoming_events(sport).catch(() => [])
+        ]);
+      } catch (e) {
+        console.warn('API Error', e);
+      }
+
+      // Limit upcoming to next 4 matches to not overflow UI
+      upcomingEvents = (upcomingEvents || []).slice(0, 4);
+
+      if (nonce !== eventsLoadNonce) return;
+
+      // ─── DISPLAY-SIDE FILTER (safe — worker untouched) ────────────────────
+      // Football: strict whitelist (La Liga, Premier, Champions) as requested
+      const FOOTBALL_OK = ['la liga', 'laliga', 'premier league', 'champions league'];
+      
+      // Tennis: blocklist only (allow everything EXCEPT these junk categories)
+      const TENNIS_BLOCKED = ['challenger', 'chall.', 'chall ', ' chall', 'itf', 'futures', ' double', 'doubles', 'junior', 'boys', 'girls'];
+
+      function passesFilter(p) {
+        const t = (p.tournament || p.comp || '').toLowerCase();
+        if (p.sport === 'football') {
+          const isLaLiga = t.includes('la liga') || t.includes('laliga') || (t.includes('spain') && t.includes('primera')) || (t.includes('españa') && t.includes('primera'));
+          const isPremier = t.includes('premier league') && !t.includes('ireland') && !t.includes('wales') && !t.includes('scotland');
+          const isChampions = t.includes('champions league') && !t.includes('women');
+          
+          if (!isLaLiga && !isPremier && !isChampions) return false;
+          return true;
+        }
+        if (p.sport === 'tennis') {
+          if (TENNIS_BLOCKED.some(kw => t.includes(kw))) return false;
+        }
+
+        // Final Time Guard: If match is marked Live but is > 24h old, or is Upcoming but > 12h away, filter out.
+        if (p.kickoffMs) {
+          const now = Date.now();
+          const diff = p.kickoffMs - now;
+          // Security: only matches started or starting in < 10min are LIVE
+          if (p.isLive && diff > 10 * 60 * 1000) return false;
+          // Window: only +/- 24h
+          if (Math.abs(diff) > 24 * 60 * 60 * 1000) return false;
+        }
+
+        return true;
+      }
+
+      liveEvents = (liveEvents || []).filter(passesFilter);
+      upcomingEvents = (upcomingEvents || []).filter(passesFilter);
+
+      // ─── LIVE CARDS ───────────────────────────────────────────────────
+      const liveHtml = (liveEvents || []).map(p => {
+        const enc = encodeURIComponent(JSON.stringify(p));
+        const scoreStr = (p.score && p.sport === 'football') ? ` ${p.score.home}-${p.score.away}` : '';
+        return `
+          <div class="evt-card" data-p="${enc}" onclick="selectEventFromP(this)" style="border-color:#4ade80;">
+            <div class="meta" style="color:#4ade80;">${p.sport === 'tennis' ? '🎾' : '⚽'} ${p.comp || ''} · 🔴 EN VIVO${scoreStr}</div>
+            <div class="teams">${p.home} vs ${p.away}</div>
+            <div class="badge" style="background:#4ade80;color:#000;">▶ OPERAR EN VIVO</div>
+          </div>`;
+      }).join('');
+
+      // ─── UPCOMING CARDS ───────────────────────────────────────────────
+      const upcomingHtml = (upcomingEvents || []).map(p => {
+        const enc = encodeURIComponent(JSON.stringify(p));
+        const timeStr = p.kickoffMs ? new Date(p.kickoffMs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+        const dateStr = p.kickoffMs ? new Date(p.kickoffMs).toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'}) : '';
+        return `
+          <div class="evt-card" data-p="${enc}" onclick="selectEventFromP(this)">
+            <div class="meta">${p.sport === 'tennis' ? '🎾' : '⚽'} ${p.comp || ''} · 📅 ${dateStr} ${timeStr}</div>
+            <div class="teams">${p.home} vs ${p.away}</div>
+            <div class="badge" style="background:rgba(255,255,255,0.1);color:#fff;">▶ PRE-PARTIDO</div>
+          </div>`;
+      }).join('');
+
+      // ─── UPCOMING SECTION HEADER ──────────────────────────────────────
+      const upcomingSection = upcomingEvents.length > 0 ? `
+        <div style="color:rgba(255,255,255,0.45); font-size:10px; font-weight:700; letter-spacing:1.5px; padding:8px 0 4px; text-transform:uppercase;">
+          📅 Próximos partidos
+        </div>
+        ${upcomingHtml}` : '';
+
+      // ─── VIRTUAL TESTS (always at bottom) ─────────────────────────────
+      const testMatchHtml = `
+        <div style="color:rgba(255,255,255,0.3); font-size:10px; font-weight:700; letter-spacing:1.5px; padding:8px 0 4px; text-transform:uppercase;">
+          🔬 Simulación
+        </div>
+        <div class="evt-card" style="border-color:#FFD400; background:rgba(255,212,0,0.07);" onclick="selectEvent({home: 'Barcelona', away: 'Real Madrid', homeStrength: 0.8, idxBase: 5, sport: 'football'})">
+          <div class="meta" style="color:#FFD400;">⚽ TEST VIRTUAL (FÚTBOL)</div>
+          <div class="teams">Barcelona vs Real Madrid</div>
+          <div class="badge">▶ PROBAR</div>
+        </div>
+        <div class="evt-card" style="border-color:#FFD400; background:rgba(255,212,0,0.07);" onclick="selectEvent({home: 'Alcaraz', away: 'Ruud', homeStrength: 0.85, idxBase: 5.5, sport: 'tennis'})">
+          <div class="meta" style="color:#FFD400;">🎾 TEST VIRTUAL (TENIS)</div>
+          <div class="teams">Alcaraz vs Ruud</div>
+          <div class="badge">▶ PROBAR</div>
+        </div>`;
+
+      const noLiveMsg = liveEvents.length === 0
+        ? `<p style="color:rgba(255,255,255,0.4); font-size:11px; text-align:center; padding:6px 0 10px;">⚠️ No hay partidos en directo ahora mismo.</p>` : '';
+
+      list.innerHTML = `<div class="evt-list">${noLiveMsg}${liveHtml}${upcomingSection}${testMatchHtml}</div>`;
+    }
+
+    async function testAPIDiagnostics() {
+      const list = document.getElementById('ev-list');
+      list.innerHTML = `<p class="loading-txt">🔍 Conectando con API: <code>${PW_API_URL}</code>...</p>`;
+      
+      try {
+        // 1. Check version/connectivity
+        const t1 = await fetch(`${PW_API_URL}/test?nocache=1&_=${Date.now()}`).then(r => r.json()).catch(() => null);
+        const version = t1?.version || "V1.0 (Sin soporte Perfection)";
+        
+        // 2. Full Debug
+        const res = await fetch(`${PW_API_URL}/debug?nocache=1&_=${Date.now()}`);
+        const d = await res.json();
+        
+        if (d && d.success) {
+          const r = d.results || {};
+          let html = `
+            <div style="background:rgba(0,0,0,0.3); padding:10px; border-radius:10px; margin-bottom:12px; font-size:11px; border:1px solid rgba(255,255,255,0.1);">
+              <div style="color:#4ade80; font-weight:900; margin-bottom:4px;">🟢 SISTEMA SINCRONIZADO</div>
+              <div style="color:rgba(255,255,255,0.5); font-size:9px;">API: ${PW_API_URL}</div>
+              <div style="color:#FFD400; font-weight:700;">Worker Version: ${version}</div>
+            </div>
+          `;
+          
+          const check = (name, data) => {
+            const ok = data && !data.error && (Array.isArray(data) ? data.length > 0 : true);
+            let count = "";
+            if (Array.isArray(data)) count = `(${data.length} partidos)`;
+            else if (data?.events) count = `(${data.events.length} partidos)`;
+            
+            return `<div style="margin-bottom:4px; font-size:10px;">${ok ? '🟢' : '🔴'} <b>${name}</b>: ${ok ? 'Conectado '+count : (data?.error || 'Sin datos')}</div>`;
+          };
+
+          html += check("Sofa Native Tennis", r.sofa_native_live_tennis);
+          html += check("Sofa Native Football", r.sofa_native_live_football);
+          
+          list.innerHTML = html;
+        } else {
+           // Si llega aquí con el error de env vars, es que el worker respondió eso.
+           const err = d?.error || 'No se pudo leer la respuesta del Worker';
+           list.innerHTML = `
+             <p class="error-txt">❌ Error en servidor: ${err}</p>
+             <div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+               <b>Posibles Causas:</b><br>
+               1. Aún no has pegado el nuevo <code>cloudflare-worker.js</code> en el panel de Cloudflare.<br>
+               2. Estás usando la URL <code>javiarmada.workers.dev</code> por error (Línea 1873 de index.html).<br>
+               3. No has pulsado "Save and Deploy" en Cloudflare.
+             </div>
+           `;
+        }
+      } catch (e) {
+        list.innerHTML = `<p class="error-txt">❌ Error de Conexión: ${e.message}</p>`;
+      }
+    }
+
+    async function selectEvent(data) {
+      const myNonce = ++selectNonce;
+
+      if (pos) { showToast('Cierra tu posición primero'); return; }
+      
+      stopPolling();
+      sim.active = true;
+      sim.freeze = false;
+      sim.v = 0;
+      sim.lastT = 0;
+      sim.tennis = null;
+      sim.tennisProg = 0;
+      sim.tennisTestMode = false;
+      sim.testMode = false;
+      if (afId) cancelAnimationFrame(afId);
+
+      const s = data.sport;
+      match.sport = s;
+      applyPitchTheme(s);
+
+      // Tabs arriba
+      document.querySelectorAll('#topbar .stab').forEach(b => b.classList.remove('on'));
+      if (s === 'tennis') document.querySelectorAll('#topbar .stab')[1]?.classList.add('on');
+      else document.querySelectorAll('#topbar .stab')[0]?.classList.add('on');
+
+      // Kickoff
+      try { data.kickoffMs = computeKickoffMs(data); } catch (e) { }
+
+      if (data.isLive) {
+        startPolling(data.eid);
+        if (s === 'tennis') startTennisLiveSofa(data.sofaId || data.eid);
+      }
+
+      // Phase 2: Compute initial idxBase from homeStrength if no odds available
+      // homeStrength 0.5 = even → idxBase 0; 0.75 = strong home → idxBase ~+3..+5
+      if (typeof data.homeStrength !== 'number') data.homeStrength = 0.5;
+      if (data.idxBase == null || !Number.isFinite(data.idxBase)) {
+        const hs = clamp(data.homeStrength, 0.05, 0.95);
+        const diff = hs - 0.5; // -0.45..+0.45
+        // Map: diff=0 → 0, diff=0.25 → ~3.5, diff=0.45 → ~6.5
+        data.idxBase = clamp(7 * Math.tanh(4 * diff), -7, 7);
+      }
+
+      // Hide overlay, init match, start animation
+      const nm = document.getElementById('no-match'); if (nm) nm.style.display = 'none';
+      initMatch(data);
+
+      // For real matches: start polling immediately, for virtual tests: run local sim
+      if (data.eid && data.isLive) {
+        // Real live match — start polling for score updates
+        startPolling(data.eid);
+      } else if (!data.idEvent && !data.lsEid && !data.eid) {
+        // Virtual test match
+        if (s === 'tennis') runTennisSim();
+        else runFootballSim();
+      }
+
+      afId = requestAnimationFrame(frame);
+      hm('m-events');
+
+      // Background fetch for extra data (odds, form)
+      fetchExtraMatchData(data, myNonce);
+    }
+
+    async function fetchExtraMatchData(data, myNonce) {
+      let pHome = (typeof data.homeStrength === 'number') ? data.homeStrength : 0.5;
+      let oddsApplied = false;
+      let idxBase = data.idxBase || 0;
+
+      try {
+        // 1. Intentar ODDS (Suelo tardar ~1-2s)
+        if (data.sport === 'football') {
+          let odds = null;
+          // Si tenemos eid (FlashLive o 1xBet), intentamos el proxy del worker
+          if (data.eid) {
+            try {
+              const res = await fetch(`${PW_API_URL}/odds/${data.eid}?sport=${data.sport}`);
+              const d = await res.json();
+              if (d.success && Array.isArray(d.odds?.DATA)) {
+                // FlashLive structure: DATA is array of markets. Type 1 is 1X2.
+                const m1x2 = d.odds.DATA.find(m => m.BOOKMAKER_BETTING_TYPE === 1);
+                if (m1x2 && Array.isArray(m1x2.ITEMS)) {
+                    odds = {
+                        oh: parseFloat(m1x2.ITEMS[0]?.ODD_OUTCOME_VALUE),
+                        od: parseFloat(m1x2.ITEMS[1]?.ODD_OUTCOME_VALUE),
+                        oa: parseFloat(m1x2.ITEMS[2]?.ODD_OUTCOME_VALUE)
+                    };
+                }
+              }
+            } catch (e) { console.warn("FlashLive Odds Error", e); }
+          }
+          
+          if (!odds && data.idEvent) {
+            odds = await fetchOddsForMatch({ home: data.home, away: data.away, leagueId: data.idLeague });
+          }
+          if (myNonce !== selectNonce) return; // Cancelado por una selección posterior
+
+          if (odds && odds.oh && odds.oa) {
+            const idxHome = oddsToIdx(odds.oh, odds.od, odds.oa);
+            oddsApplied = true;
+            pHome = clamp(0.5 + (idxHome / 12), 0.05, 0.95);
+            idxBase = clamp(Math.abs(idxHome), 0, 7);
+            
+            const favKey = (Math.abs(idxHome) < 0.25) ? 'none' : (idxHome > 0 ? 'home' : 'away');
+            match.display = match.display || { leftKey: 'away', rightKey: 'home', favKey: 'none', eps: 0.02 };
+            match.display.favKey = favKey;
+            setSides(favKey !== 'none' ? favKey : 'home');
+            
+            data.commence_time = odds.commence_time;
+          }
+        }
+
+        // 2. Si es TENIS, intentar RANKINGS (NUEVO)
+        if (data.sport === 'tennis' && !oddsApplied) {
+           try {
+             const res = await fetch(`${PW_API_URL}/tennis/rankings`);
+             const d = await res.json();
+             if (d.success && (d.rankings.atp || d.rankings.wta)) {
+               const allRanks = [...(d.rankings.atp || []), ...(d.rankings.wta || [])];
+               const findRank = (name) => {
+                 const n = normalizeName(name);
+                 const entry = allRanks.find(r => normalizeName(r.full_name).includes(n) || n.includes(normalizeName(r.full_name)));
+                 return entry ? parseInt(entry.rank) : null;
+               };
+               const rH = findRank(data.home);
+               const rA = findRank(data.away);
+               
+               if (rH && rA) {
+                  // Rank 1 vs 100 => diff = 99 (Home much stronger)
+                  const diff = rA - rH; 
+                  // Map rank diff to idxBase (e.g. diff 50 -> idx 3.5)
+                  idxBase = clamp(diff / 15, -7, 7); 
+                  pHome = clamp(0.5 + (idxBase / 12), 0.05, 0.95);
+                  oddsApplied = true;
+                  
+                  const favKey = (Math.abs(idxBase) < 0.25) ? 'none' : (idxBase > 0 ? 'home' : 'away');
+                  match.display = match.display || { leftKey: 'away', rightKey: 'home', favKey: 'none', eps: 0.02 };
+                  match.display.favKey = favKey;
+                  setSides(favKey !== 'none' ? favKey : 'home');
+                  console.log(`[Rankings] Fixed: ${data.home}(#${rH}) vs ${data.away}(#${rA}) -> IdxBase=${idxBase.toFixed(1)}`);
+               }
+             }
+           } catch(e) { console.warn("Tennis Rankings Error", e); }
+        }
+
+        // 3. Si no hay ODDS (ni rankings en tenis), intentar FORMA (SPORTSDB - tarda ~1-2s)
+        if (!oddsApplied && data.idHomeTeam && data.idAwayTeam) {
+          pHome = await estimateHomeStrengthFromForm(data.idHomeTeam, data.idAwayTeam);
+          if (myNonce !== selectNonce) return;
+          
+          pHome = clamp(pHome, 0.05, 0.95);
+          const favKey = decideFavKey(pHome, match.display?.eps ?? 0.02);
+          match.display = match.display || { leftKey: 'away', rightKey: 'home', favKey: 'none', eps: 0.02 };
+          match.display.favKey = favKey;
+          setSides(favKey !== 'none' ? favKey : 'home');
+
+          const rK = match.display.rightKey || 'home';
+          const pRight = (rK === 'home') ? pHome : (1 - pHome);
+          idxBase = probDiffToIdx(Math.abs(2 * pRight - 1));
+        }
+
+        // 4. Aplicar refinamientos al match activo
+        if (myNonce === selectNonce) {
+          match.homeStrength = pHome;
+          match.idxBase = idxBase;
+          renderLabels();
+          renderScoreboard(match.homeScore, match.awayScore);
+          
+          // Si el partido está en pre-kick, re-congelamos con el nuevo idxBase
+          if (sim.freeze) {
+             sim.freezeIdx = clamp(idxBase, -10, 10);
+             sim.idx = sim.freezeIdx;
+             sim.targetIdx = sim.idx;
+          }
+          
+          console.log(`[Background] Datos actualizados: Strength=${pHome.toFixed(2)}, IdxBase=${idxBase.toFixed(1)}`);
+        }
+      } catch (e) {
+        console.warn('[Background] Error cargando datos extra:', e);
+      }
+    }
+
+
+    // Click seguro desde tarjetas (evita problemas de comillas en nombres como O'Higgins, etc.)
+    function selectEventFromP(cardEl) {
+      try {
+        const enc = cardEl?.dataset?.p;
+        if (!enc) return;
+        const data = JSON.parse(decodeURIComponent(enc));
+        selectEvent(data);
+      } catch (e) { console.error('selectEventFromP error', e); }
+    }
+
+    // ── HELPERS ────────────────────────────────────────
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg; t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 1800);
+    }
+
+    // Captura errores JS y muestra aviso (evita 'pantalla congelada')
+    window.addEventListener('error', (ev) => {
+      try { showToast('⚠️ Error JS: ' + (ev.message || 'desconocido')); } catch (e) { }
+    });
+
+
+    // ── ZOOM (ventana alrededor de la bola) ───────────────────────────
+    let zoomOn = false;
+    let VIEW_RANGE = 10; // Fijo para ambos deportes (diez arriba, diez abajo)
+    let ZOOM_RANGE = 1.5; // Zoom estricto más acercado
+    const BALL_R = 9; // radio del círculo principal
+
+    // Desplazamiento vertical (look-ahead) en ZOOM: evita que la bola quede siempre centrada
+    // y la coloca más arriba si el índice es positivo, más abajo si es negativo.
+    let ZOOM_LEAD_K = 0.20;   // cuánto bascula por punto de índice (suavizado a 0.20 para flotar más)
+    let ZOOM_LEAD_MAX = 0.85; // % del rango máximo permitido para no pegarse al borde
+
+    let zoomCenter = 0;     // centro de cámara (suavizado)
+    let zoomCenterUI = 0;   // centro de la leyenda (seguirá al centro de vista)
+
+    // Cámara (para mantener bola y background sincronizados en ZOOM)
+    let camS = 1;
+    let camPanX = 0;
+    let camPanY = 0;
+    let camViewCenter = 0;
+    function renderAxisLabels() {
+      const gov = document.getElementById('gov-timeline');
+      if (!gov) return;
+
+      if (!zoomOn) {
+        gov.innerHTML = `
+      <div class="gl-row" data-v="+10"><span>+10</span><div class="line"></div></div>
+      <div class="gl-row" data-v="+5"><span>+5</span><div class="line"></div></div>
+      <div class="gl-row main" data-v="0"><span>0</span><div class="line"></div></div>
+      <div class="gl-row" data-v="-5"><span>-5</span><div class="line"></div></div>
+      <div class="gl-row" data-v="-10"><span>-10</span><div class="line"></div></div>
+    `;
+        return;
+      }
+
+      const r = ZOOM_RANGE;
+      const c = zoomCenterUI;
+      const fmt = (v) => {
+        const s = (v > 0 ? '+' : (v < 0 ? '' : ''));
+        return s + v.toFixed(1);
+      };
+
+      gov.innerHTML = `
+    <div class="gl-row" data-v="t"><span>${fmt(c + r)}</span><div class="line"></div></div>
+    <div class="gl-row" data-v="m"><span>${fmt(c + r / 2)}</span><div class="line"></div></div>
+    <div class="gl-row main" data-v="c"><span>${fmt(c)}</span><div class="line"></div></div>
+    <div class="gl-row" data-v="m2"><span>${fmt(c - r / 2)}</span><div class="line"></div></div>
+    <div class="gl-row" data-v="b"><span>${fmt(c - r)}</span><div class="line"></div></div>
+  `;
+    }
+
+    function applyBackgroundZoom() {
+      const pv = document.getElementById('pitch-visual');
+      const pitch = document.getElementById('pitch');
+      if (!pv || !pitch) return;
+
+      if (!zoomOn) {
+        pv.style.transformOrigin = '50% 50%';
+        pv.style.transform = '';
+        camS = 1; camPanX = 0; camPanY = 0; camViewCenter = 0;
+        return;
+      }
+
+      // Zoom + parallax X (avance) + basculación Y.
+      // Nota: en CSS las funciones se aplican right-to-left, así que scale() ocurre antes y translate() después.
+      // Resultado: la traslación está en px de pantalla (no se escala).
+      const W = pitch.clientWidth || 1;
+      const H = pitch.clientHeight || 1;
+      const cx = W / 2, cy = H / 2;
+
+      // Escala EXACTA del zoom para que coincida matemáticamente con las etiquetas de gov-timeline.
+      // Si el VIEW_RANGE es 10 y el ZOOM_RANGE es 2, el zoom DEBE ser 5.0 (sin clamp arbitrario).
+      camS = VIEW_RANGE / Math.max(0.01, ZOOM_RANGE);
+
+      // Progreso horizontal (0..1) basado en X actual
+      const prog = clamp(((sim.x ?? 0) / W), 0, 1);
+      const panRangeX = (camS - 1) * W;
+      // Compensa el centrado del scale(): inicio:+pan/2, final:-pan/2
+      camPanX = (0.5 - prog) * panRangeX;
+
+      // Centro de vista vertical: sigue el índice con suavizado MUCHO más lento ("flotante")
+      zoomCenter += (sim.idx - zoomCenter) * 0.04;
+
+      camViewCenter = zoomCenter; // La bola queda siempre exactamente en el centro Y de la pantalla.
+
+      // Convertimos el centro de vista (en unidades de índice) a coordenada mundo (px)
+      const worldCenterY = ((VIEW_RANGE - camViewCenter) / (2 * VIEW_RANGE)) * H;
+      const panRangeY = (camS - 1) * H;
+      const panYraw = (cy - worldCenterY) * camS;
+      camPanY = clamp(panYraw, -panRangeY / 2, panRangeY / 2);
+
+      pv.style.transformOrigin = '50% 50%';
+      pv.style.transform = `translate(${camPanX.toFixed(1)}px, ${camPanY.toFixed(1)}px) scale(${camS.toFixed(3)})`;
+    }
+
+    function toggleZoom() {
+      zoomOn = !zoomOn;
+      const b = document.getElementById('btn-zoom');
+      if (b) b.classList.toggle('on', zoomOn);
+
+      zoomCenter = sim.idx;
+      zoomCenterUI = sim.idx;
+
+      applyBackgroundZoom();
+      renderAxisLabels();
+
+      showToast(zoomOn ? `🔎 ZOOM (±${ZOOM_RANGE})` : '🔎 ZOOM OFF');
+    }
+
+    let _lastAxisT = 0;
+    function tickAxis(nowMs) {
+      if (!zoomOn) return;
+      if (nowMs - _lastAxisT < 70) return; // ~14fps
+      _lastAxisT = nowMs;
+      renderAxisLabels();
+    }
+
+    function showErr(modalId, msg) {
+      const e = document.getElementById(modalId + '-err');
+      if (e) { e.innerText = msg; e.style.display = 'block'; }
+    }
+    function setLoading(btnId, loading) {
+      const b = document.getElementById(btnId);
+      if (!b) return;
+      b.disabled = loading;
+      b.innerHTML = loading ? '<span class="spin"></span> Cargando...' : (btnId === 'login-btn' ? 'Entrar' : 'Empezar a operar');
+    }
+    function hm(id) { document.getElementById(id).classList.add('h'); }
+
+    // ── EMPTY STATE & AUTO LOAD ──
+    function setNoMatchState(sport, nextTime) {
+      document.getElementById('team-home').innerText = 'NO HAY PARTIDOS';
+      document.getElementById('team-away').innerText = 'EN DIRECTO';
+      document.getElementById('live-score').innerText = '-';
+      document.getElementById('match-time').innerText = nextTime ? `Próximo: ${nextTime}` : (sport === 'tennis' ? 'Buscando tenis...' : 'Buscando fútbol...');
+      document.getElementById('tennis-inline-points').style.display = (sport === 'tennis') ? 'block' : 'none';
+      document.getElementById('lbl-home').innerText = sport === 'tennis' ? 'Jugador 1' : 'Visitante';
+      document.getElementById('lbl-away').innerText = sport === 'tennis' ? 'Jugador 2' : 'Local';
+
+      sim.active = true;
+      sim.idx = 0;
+      sim.targetIdx = 0;
+      const iv = document.getElementById('idx');
+      iv.innerText = 'ESPERANDO';
+      iv.style.color = 'rgba(255,255,255,0.4)';
+      iv.style.textShadow = 'none';
+
+      // Center ball
+      const pitch = document.getElementById('pitch');
+      if (pitch) {
+        const W = pitch.clientWidth, H = pitch.clientHeight;
+        sim.x = W / 2;
+        const yPos = H / 2;
+        document.getElementById('ball').setAttribute('transform', `translate(${sim.x},${yPos})`);
+        document.getElementById('trail').setAttribute('d', '');
+      }
+    }
+
+    async function autoLoadMatch(sport) {
+      setNoMatchState(sport);
+      try {
+        // Priority 1: Our High-Quality RapidAPI via Worker
+        let live = await PW_live_events(sport);
+        if (live && live.length > 0) {
+          selectEvent(live[0]);
+          return;
+        }
+        
+        // Priority 2: Upcoming matches from our worker
+        let upcoming = await PW_upcoming_events(sport);
+        if (upcoming && upcoming.length > 0) {
+          selectEvent(upcoming[0]);
+          return;
+        }
+
+        // Fallback: TheSportsDB (Legacy)
+        const today = new Date().toISOString().split('T')[0];
+        const sportStr = sport === 'tennis' ? 'Tennis' : 'Soccer';
+        let r = await fetch(`${SPORTSDB_BASE}/eventsday.php?d=${today}&s=${sportStr}`);
+        let d = await r.json();
+        let events = d.events || [];
+
+        if (events.length > 0) {
+          const liveEvent = events.find(e => {
+            const st = (e.strStatus || '').toLowerCase();
+            return st === 'in progress' || st === '1h' || st === '2h' || st === 'ht' || e.intElapsed > 0;
+          });
+
+          if (liveEvent) {
+            selectEvent({
+              home: liveEvent.strHomeTeam, away: liveEvent.strAwayTeam,
+              homeStrength: 0.5,
+              sport, idEvent: liveEvent.idEvent,
+              idHomeTeam: liveEvent.idHomeTeam, idAwayTeam: liveEvent.idAwayTeam, idLeague: liveEvent.idLeague, season: liveEvent.strSeason
+            });
+            return;
+          }
+          
+          const nowStr = new Date().toTimeString().slice(0, 5);
+          const next = events.filter(e => (e.strTime || '').slice(0, 5) >= nowStr)
+            .sort((a, b) => (a.strTime || '').localeCompare(b.strTime || ''));
+          
+          if (next.length > 0) {
+            setNoMatchState(sport, (next[0].strTime || '').slice(0, 5));
+          } else {
+            setNoMatchState(sport, 'Mañana');
+          }
+        } else {
+          setNoMatchState(sport, 'Sin eventos');
+        }
+      } catch (e) {
+        setNoMatchState(sport, '---');
+      }
+    }
+
+
+    // ─────────────────────────────────────────────────────────
+    // ✅ FIX: enlaza botones por JS (por si el navegador/CSP ignora onclick inline)
+    // Esto hace que los botones respondan SIEMPRE mientras el script esté cargado.
+    // ─────────────────────────────────────────────────────────
+    function bindUI() {
+      try {
+        const snd = document.getElementById('btn-snd');
+        if (snd) snd.onclick = (e) => { e.preventDefault(); try { toggleSound(); } catch (_) { } };
+        const zoom = document.getElementById('btn-zoom');
+        if (zoom) zoom.onclick = (e) => { e.preventDefault(); try { toggleZoom(); } catch (_) { } };
+        const plus = document.querySelector('.btn-plus');
+        if (plus) plus.onclick = (e) => { e.preventDefault(); try { showEvents(); } catch (_) { } };
+        const av = document.querySelector('.avatar');
+        if (av) av.onclick = (e) => { e.preventDefault(); try { handleAvatarClick(); } catch (_) { } };
+
+        // Tabs deporte
+        const tabs = document.querySelectorAll('#topbar .stab');
+        if (tabs && tabs.length >= 2) {
+          tabs[0].onclick = (e) => { e.preventDefault(); try { switchSport('football', tabs[0]); } catch (_) { } };
+          tabs[1].onclick = (e) => { e.preventDefault(); try { switchSport('tennis', tabs[1]); } catch (_) { } };
+        }
+
+        // Action bar
+        const buy = document.querySelector('#abar .btn-b');
+        if (buy) buy.onclick = (e) => { e.preventDefault(); try { openPos('BUY'); } catch (_) { } };
+        const sell = document.querySelector('#abar .btn-s');
+        if (sell) sell.onclick = (e) => { e.preventDefault(); try { openPos('SELL'); } catch (_) { } };
+        const exit = document.getElementById('btn-exit');
+        if (exit) exit.onclick = (e) => { e.preventDefault(); try { closePos(); } catch (_) { } };
+
+        // Modal: cerrar tocando fondo ya está en onload, pero reforzamos
+        document.querySelectorAll('.mback').forEach(el => {
+          el.addEventListener('click', ev => { if (ev.target === el) el.classList.add('h'); });
+        });
+
+        // Indicador minúsculo de “JS OK” (debug)
+        if (!document.getElementById('js-ok-dot')) {
+          const d = document.createElement('div');
+          d.id = 'js-ok-dot';
+          d.style.cssText = 'position:fixed;left:6px;bottom:6px;width:8px;height:8px;border-radius:50%;background:#4ade80;opacity:.85;z-index:9999;';
+          d.title = 'JS OK';
+          document.body.appendChild(d);
+        }
+      } catch (e) { }
+    }
+
+    // ── INIT ───────────────────────────────────────────
+    // Si el documento ya está cargado, enlaza UI inmediatamente
+    try { if (document.readyState === 'interactive' || document.readyState === 'complete') bindUI(); } catch (e) { }
+
+    window.onload = async () => {
+      bindUI();
+      applyPitchTheme('football');
+      setNoMatchState('football');
+      // Por defecto: próximo partido de fútbol (EPL/LaLiga). Sin banner al abrir.
+      autoPickDefaultFootball().then(ok => { if (!ok) autoLoadMatch('football'); });
+      document.querySelectorAll('.mback').forEach(el => {
+        el.addEventListener('click', e => { if (e.target === el) el.classList.add('h'); });
+      });
+      // Kick animation loop
+      sim.active = true;
+      if (afId) cancelAnimationFrame(afId);
+      afId = requestAnimationFrame(frame);
+    };
+
+
+    try {
+      window.switchSport = switchSport;
+      window.showEvents = showEvents;
+      window.handleAvatarClick = handleAvatarClick;
+      window.loadEvents = loadEvents;
+      window.selectEvent = selectEvent;
+      window.selectEventFromP = selectEventFromP;
+      window.toggleSound = toggleSound;
+      window.toggleZoom = toggleZoom;
+      window.openPos = openPos;
+      window.closePos = closePos;
+      window.hm = hm;
+    } catch (e) { }
+
+
+    // MOBILE_AVATAR_FORCE_AUTH: fuerza apertura del login desde el avatar (móvil)
+    (function () {
+      function onAvatar(ev) {
+        try {
+          const t = ev.target;
+          const av = t && t.closest ? t.closest('.avatar') : null;
+          if (!av) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          try {
+            if (typeof user !== 'undefined' && user) showProfile();
+            else showAuth('login');
+          } catch (_) { }
+        } catch (_) { }
+      }
+      document.addEventListener('pointerdown', onAvatar, true);
+      document.addEventListener('touchstart', onAvatar, { capture: true, passive: false });
+      document.addEventListener('click', onAvatar, true);
+    })();
+
+  </script>
+</body>
+
+</html>
