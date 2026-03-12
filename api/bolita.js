@@ -26,8 +26,8 @@ function isFromToday(kickoffMs) {
     return kickoffDate === nowStr || kickoffDate === yesterdayStr;
 }
 
-// Handler Principal para Vercel Serverless
-export default async function handler(req, res) {
+// Handler Principal para Vercel Serverless (CommonJS support)
+module.exports = async function handler(req, res) {
     const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY || RAPIDAPI_KEY_FALLBACK;
 
     // CORS
